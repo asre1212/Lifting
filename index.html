@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -454,6 +455,41 @@
     }
 
     /* ──────────────────────────────────────
+       BACKUP SECTION
+    ────────────────────────────────────── */
+    .backup-card {
+      background: var(--card);
+      border: 1.5px solid var(--border);
+      border-radius: 16px;
+      overflow: hidden;
+      margin-bottom: 24px;
+    }
+    .backup-row {
+      display: flex; align-items: center;
+      padding: 14px 18px; gap: 14px;
+    }
+    .backup-icon-wrap {
+      width: 36px; height: 36px; border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+    }
+    .backup-info { flex: 1; min-width: 0; }
+    .backup-title { font-size: 13px; font-weight: 700; }
+    .backup-sub { font-size: 10px; color: var(--muted); margin-top: 2px; font-weight: 600; letter-spacing: .1px; }
+    .backup-divider { height: 1px; background: var(--border); margin: 0 18px; }
+    .backup-btn {
+      flex-shrink: 0;
+      display: flex; align-items: center; gap: 6px;
+      padding: 8px 14px; border-radius: 9px; border: none;
+      font-family: inherit; font-size: 11px; font-weight: 800;
+      cursor: pointer; transition: transform .15s; letter-spacing: .3px;
+      text-transform: uppercase;
+    }
+    .backup-btn:active { transform: scale(.94); }
+    .backup-btn.export { background: var(--text); color: #fff; }
+    .backup-btn.import { background: var(--bg); color: var(--text); border: 1.5px solid var(--border); }
+
+    /* ──────────────────────────────────────
        TOAST
     ────────────────────────────────────── */
     .toast {
@@ -510,6 +546,54 @@
       <span class="sec-label-line"></span>
     </div>
     <div id="home-muscles"></div>
+
+    <div class="sec-label-row" style="margin-top:8px">
+      <span class="sec-label">Backup &amp; Transfer</span>
+      <span class="sec-label-line"></span>
+    </div>
+    <div class="backup-card">
+      <div class="backup-row">
+        <div class="backup-icon-wrap" style="background:#F0EFFF">
+          <i data-lucide="download" width="17" height="17" style="color:var(--back)"></i>
+        </div>
+        <div class="backup-info">
+          <div class="backup-title">Export Data</div>
+          <div class="backup-sub">Save all workouts to a file</div>
+        </div>
+        <button class="backup-btn export" onclick="exportData()">
+          <i data-lucide="share-2" width="13" height="13"></i>
+          Export
+        </button>
+      </div>
+      <div class="backup-divider"></div>
+      <div class="backup-row">
+        <div class="backup-icon-wrap" style="background:#F0FFF9">
+          <i data-lucide="upload" width="17" height="17" style="color:var(--legs)"></i>
+        </div>
+        <div class="backup-info">
+          <div class="backup-title">Import Data</div>
+          <div class="backup-sub">Restore from a backup file</div>
+        </div>
+        <button class="backup-btn import" onclick="importData()">
+          <i data-lucide="folder-open" width="13" height="13"></i>
+          Import
+        </button>
+      </div>
+      <div class="backup-divider"></div>
+      <div class="backup-row">
+        <div class="backup-icon-wrap" style="background:#FFFAF0">
+          <i data-lucide="refresh-cw" width="17" height="17" style="color:var(--core)"></i>
+        </div>
+        <div class="backup-info">
+          <div class="backup-title">Check for Updates</div>
+          <div class="backup-sub">Reload latest version from server</div>
+        </div>
+        <button class="backup-btn import" onclick="reloadApp()" id="reload-btn">
+          <i data-lucide="refresh-cw" width="13" height="13"></i>
+          Refresh
+        </button>
+      </div>
+    </div>
   </div>
 
   <!-- ═══════════════ LOG ═══════════════ -->
@@ -1256,6 +1340,90 @@
     upd(idx, 'exercise', name);
     const box = document.getElementById('sug-' + idx);
     if (box) { box.innerHTML = ''; box.classList.remove('open'); }
+  }
+
+  /* ──────────────────────────────────────
+     EXPORT / IMPORT
+  ────────────────────────────────────── */
+  function reloadApp() {
+    const btn = document.getElementById('reload-btn');
+    if (btn) { btn.textContent = 'Loading…'; btn.disabled = true; }
+    window.location.reload();
+  }
+
+  async function exportData() {
+    const payload = {
+      app: 'LiftTrack',
+      exported: new Date().toISOString(),
+      workouts: getWO(),
+      exercises: getEx()
+    };
+    const json = JSON.stringify(payload, null, 2);
+    const blob = new Blob([json], { type: 'application/json' });
+    const date = new Date().toISOString().split('T')[0];
+    const filename = `lifttrack-backup-${date}.json`;
+    const file = new File([blob], filename, { type: 'application/json' });
+
+    // iOS Safari: use Web Share API (file sharing)
+    if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+      try {
+        await navigator.share({ files: [file], title: 'LiftTrack Backup' });
+        return;
+      } catch(e) {
+        if (e.name === 'AbortError') return; // user cancelled, no error needed
+      }
+    }
+
+    // Desktop / fallback: direct download
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  function importData() {
+    const input = document.createElement('input');
+    input.type = 'file'; input.accept = '.json,application/json';
+    input.onchange = e => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = ev => {
+        try {
+          const data = JSON.parse(ev.target.result);
+          if (!data.workouts && !data.exercises) throw new Error('Unrecognised file');
+
+          // Merge rather than overwrite — combine workouts deduped by id
+          if (data.workouts) {
+            const existing = getWO();
+            const existingIds = new Set(existing.map(w => w.id));
+            const merged = [...existing, ...data.workouts.filter(w => !existingIds.has(w.id))];
+            merged.sort((a,b) => a.date.localeCompare(b.date));
+            setWO(merged);
+          }
+          // Merge exercise name lists
+          if (data.exercises) {
+            const ex = getEx();
+            Object.keys(data.exercises).forEach(sec => {
+              if (ex[sec]) {
+                data.exercises[sec].forEach(n => { if (!ex[sec].includes(n)) ex[sec].push(n); });
+              }
+            });
+            setEx(ex);
+          }
+
+          rebuildDL();
+          renderHome();
+          toast(`✓ Import complete`);
+        } catch(err) {
+          toast('Invalid backup file');
+        }
+      };
+      reader.readAsText(file);
+    };
+    input.click();
   }
 
   /* ──────────────────────────────────────
