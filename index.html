@@ -1039,21 +1039,31 @@
         const last = exE[exE.length - 1];
         const lastW = last.weight;
 
-        let daysSince = null, isPR = false;
+        let daysSince = null, isPR = false, increaseDate = null;
         for (let i = exE.length - 1; i >= 1; i--) {
           if (exE[i].weight > exE[i-1].weight) {
-            daysSince = Math.floor((now - new Date(exE[i].date + 'T00:00:00')) / 86400000);
+            const d = new Date(exE[i].date + 'T00:00:00');
+            daysSince = Math.floor((now - d) / 86400000);
+            increaseDate = d;
             isPR = (i === exE.length - 1);
             break;
           }
         }
 
+        function fmtDate(d) {
+          const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+          const isThisYear = d.getFullYear() === now.getFullYear();
+          return isThisYear
+            ? `${months[d.getMonth()]} ${d.getDate()}`
+            : `${months[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`;
+        }
+
         let dTxt, dClass = '';
         if (daysSince === null)   { dTxt = exE.length === 1 ? 'First log' : 'No increase yet'; }
-        else if (daysSince === 0) { dTxt = '↑ Increased today'; dClass = 'up'; }
-        else if (daysSince === 1) { dTxt = '↑ Yesterday'; dClass = 'up'; }
+        else if (daysSince === 0) { dTxt = '↑ Today'; dClass = 'up'; }
+        else if (daysSince === 1) { dTxt = `↑ Yesterday · ${fmtDate(increaseDate)}`; dClass = 'up'; }
         else {
-          dTxt = `${daysSince}d since increase`;
+          dTxt = `↑ ${fmtDate(increaseDate)} · ${daysSince}d ago`;
           dClass = daysSince > 21 ? 'warn' : '';
         }
 
