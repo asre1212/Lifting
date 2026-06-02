@@ -1,8 +1,8 @@
 {
   "name": "LiftTrack",
   "short_name": "LiftTrack",
-  "description": "Mobile weight lifting tracker — log, trend, and own your gains.",
-  "start_url": "./LiftTrack.html",
+  "description": "Mobile weight lifting tracker \u2014 log, trend, calendar, and own your gains.",
+  "start_url": "./",
   "scope": "./",
   "display": "standalone",
   "background_color": "#0D0D0D",

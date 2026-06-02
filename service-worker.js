@@ -6,12 +6,14 @@
      • Everything else           → network-first, fall to cache
    ───────────────────────────────────────────────────────────────────────── */
 
-const VERSION     = 'lifttrack-v2';
+const VERSION     = 'lifttrack-v3-calendar';
 const CACHE_SHELL = VERSION + '-shell';
 const CACHE_CDN   = VERSION + '-cdn';
 
 // Files that must be cached on install for offline use
 const SHELL_ASSETS = [
+  './',
+  './index.html',
   './LiftTrack.html',
   './manifest.json',
   './icon-192.png',
