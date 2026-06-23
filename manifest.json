@@ -1,7 +1,7 @@
 {
   "name": "LiftTrack",
   "short_name": "LiftTrack",
-  "description": "Mobile weight lifting tracker \u2014 log, trend, calendar, and own your gains.",
+  "description": "Mobile lifting tracker with body-section calendar and progress trends.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",

@@ -6,7 +6,7 @@
      • Everything else           → network-first, fall to cache
    ───────────────────────────────────────────────────────────────────────── */
 
-const VERSION     = 'lifttrack-v3-calendar';
+const VERSION     = 'lifttrack-v4-body-sections';
 const CACHE_SHELL = VERSION + '-shell';
 const CACHE_CDN   = VERSION + '-cdn';
 
@@ -14,7 +14,6 @@ const CACHE_CDN   = VERSION + '-cdn';
 const SHELL_ASSETS = [
   './',
   './index.html',
-  './LiftTrack.html',
   './manifest.json',
   './icon-192.png',
   './icon-512.png',
