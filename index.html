@@ -274,7 +274,7 @@
     .date-bar svg { color: var(--muted); flex-shrink: 0; }
     .date-bar input[type="date"] {
       flex: 1; border: none; background: transparent;
-      font-family: inherit; font-size: 14px; font-weight: 700;
+      font-family: inherit; font-size: 16px; font-weight: 700;
       color: var(--text); outline: none; letter-spacing: -.3px;
     }
 
@@ -315,7 +315,7 @@
     .ex-inp {
       width: 100%;
       border: none; background: transparent;
-      font-family: inherit; font-size: 14px; font-weight: 700;
+      font-family: inherit; font-size: 16px; font-weight: 700;
       color: var(--text); outline: none; letter-spacing: -.3px;
       padding: 0; min-width: 0;
     }
@@ -353,7 +353,7 @@
     .ex-del:hover, .ex-del:active { background: #FFF0EE; border-color: var(--arms); color: var(--arms); }
 
     .ex-meta { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:10px; }
-    .ex-select { border:1.5px solid var(--border); border-radius:9px; padding:9px 28px 9px 9px; font-family:inherit; font-size:11px; font-weight:700; color:var(--text); background:var(--bg); width:100%; appearance:none; }
+    .ex-select { border:1.5px solid var(--border); border-radius:9px; padding:9px 28px 9px 9px; font-family:inherit; font-size:16px; font-weight:700; color:var(--text); background:var(--bg); width:100%; appearance:none; }
     .ex-fields { display:grid; grid-template-columns:1fr 1fr; gap:8px; align-items:end; }
     .ex-field.weight-field { grid-column:span 1; }
     .ex-field.duration-field { grid-column:span 1; }
@@ -364,7 +364,7 @@
     .ex-field-inp {
       border: 1.5px solid var(--border); border-radius: 9px;
       padding: 9px 8px;
-      font-family: inherit; font-size: 15px; font-weight: 700;
+      font-family: inherit; font-size: 16px; font-weight: 700;
       color: var(--text); background: var(--bg);
       text-align: center; width: 100%;
       transition: border-color .15s, background .15s;
@@ -415,7 +415,7 @@
     .fsel {
       border: 1.5px solid var(--border); border-radius: 11px;
       padding: 10px 32px 10px 12px;
-      font-family: inherit; font-size: 12px; font-weight: 700;
+      font-family: inherit; font-size: 16px; font-weight: 700;
       background: var(--card); color: var(--text); cursor: pointer;
       appearance: none;
       background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%239A9A90' stroke-width='1.8' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
@@ -500,7 +500,7 @@
     .mc-move-btn { width:26px; height:26px; border-radius:7px; border:1.5px solid var(--border); background:transparent; color:var(--muted); display:flex; align-items:center; justify-content:center; cursor:pointer; }
     .mc-move-bar { display:none; align-items:center; gap:7px; padding:10px 12px; background:#F1F7FF; border-top:1px solid #CDE2FF; }
     .mc-move-bar.show { display:flex; }
-    .mc-move-bar select { flex:1; min-width:0; border:1.5px solid var(--border); border-radius:8px; padding:7px; background:#fff; font:700 10px inherit; }
+    .mc-move-bar select { flex:1; min-width:0; border:1.5px solid var(--border); border-radius:8px; padding:7px; background:#fff; font:700 16px inherit; }
     .mc-move-go { border:0; border-radius:8px; padding:7px 10px; background:var(--general); color:#fff; font:800 10px inherit; cursor:pointer; }
     .weight-mode-note { display:block; font-size:9px; color:var(--muted); font-weight:700; margin-top:2px; }
 
@@ -906,7 +906,7 @@
     const total=(Number(r.weight||0)*(r.weightMode==='each'?2:1)),vol=(r.sets!==''&&r.reps!==''?Number(r.sets)*Number(r.reps)*total:0);
     const div=document.createElement('div');div.className='ex-card';div.dataset.idx=idx;
     div.innerHTML=`<div class="ex-card-top"><div class="ex-inp-wrap"><input class="ex-inp" placeholder="Exercise name…" value="${esc(r.exercise)}" autocomplete="off" oninput="exerciseChanged(this,${idx});showSugs(this,${idx})" onfocus="showSugs(this,${idx})" onblur="hideSugs(${idx})"><div class="sug-box" id="sug-${idx}"></div></div><button class="ex-del" onclick="delCard(${idx})"><i data-lucide="x" width="14" height="14"></i></button></div>
-      <div class="ex-meta"><div class="ex-field"><span class="ex-field-lbl">Subgroup</span><select class="ex-select subgroup-select" onchange="upd(${idx},'subgroup',this.value)">${subgroupOptions(curSec,r.subgroup)}</select></div><div class="ex-field"><span class="ex-field-lbl">Weight Type</span><select class="ex-select" onchange="upd(${idx},'weightMode',this.value);reVol(this,${idx})"><option value="total" ${r.weightMode==='total'?'selected':''}>Total</option><option value="each" ${r.weightMode==='each'?'selected':''}>Each side</option></select></div></div>
+      <div class="ex-meta"><div class="ex-field"><span class="ex-field-lbl">Subgroup</span><select class="ex-select subgroup-select" onchange="upd(${idx},'subgroup',this.value)">${subgroupOptions(curSec,r.subgroup)}</select></div><div class="ex-field"><span class="ex-field-lbl">Weight Type</span><select class="ex-select weightmode-select" onchange="upd(${idx},'weightMode',this.value);reVol(this,${idx})"><option value="total" ${r.weightMode==='total'?'selected':''}>Total</option><option value="each" ${r.weightMode==='each'?'selected':''}>Each side</option></select></div></div>
       <div class="ex-fields">
         <div class="ex-field"><span class="ex-field-lbl">Sets<button class="metric-clear" onclick="clearMetric(${idx},'sets',this)" aria-label="Clear sets">×</button></span><input data-field="sets" class="ex-field-inp" type="number" min="1" max="99" value="${r.sets!==''?r.sets:''}" placeholder="Optional" oninput="upd(${idx},'sets',this.value);reVol(this,${idx})"></div>
         <div class="ex-field"><span class="ex-field-lbl">Reps<button class="metric-clear" onclick="clearMetric(${idx},'reps',this)" aria-label="Clear reps">×</button></span><input data-field="reps" class="ex-field-inp" type="number" min="1" max="999" value="${r.reps!==''?r.reps:''}" placeholder="Optional" oninput="upd(${idx},'reps',this.value);reVol(this,${idx})"></div>
@@ -918,7 +918,48 @@
   function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
   function fmt(n){return Number(n).toLocaleString();}
   function upd(idx,field,val){if(!rows[curSec][idx])return;const stringFields=['exercise','subgroup','weightMode'];rows[curSec][idx][field]=stringFields.includes(field)?val:(val===''?'':Number(val));}
-  function exerciseChanged(inp,idx){upd(idx,'exercise',inp.value);const r=rows[curSec][idx];const guess=inferSubgroup(inp.value,curSec);if(!r.subgroup||r.subgroup===(SUBGROUPS[curSec]||[]).slice(-1)[0]){r.subgroup=guess;const sel=inp.closest('.ex-card').querySelector('.subgroup-select');if(sel)sel.value=guess;}}
+  function exerciseChanged(inp,idx){upd(idx,'exercise',inp.value);const r=rows[curSec][idx];const guess=inferSubgroup(inp.value,curSec);if(!r.subgroup||r.subgroup===(SUBGROUPS[curSec]||[]).slice(-1)[0]){r.subgroup=guess;const sel=inp.closest('.ex-card').querySelector('.subgroup-select');if(sel)sel.value=guess;}autofillFromHistory(idx,inp.value);}
+
+  /* ──────────────────────────────────────
+     LOG — autofill prior weights
+  ────────────────────────────────────── */
+  function findLastEntry(name){
+    const n=(name||'').trim().toLowerCase();
+    if(!n)return null;
+    let best=null;
+    getWO().forEach(w=>{
+      (w.entries||[]).forEach(e=>{
+        if((e.exercise||'').trim().toLowerCase()===n && (!best||w.date>best.date)) best={...e,date:w.date};
+      });
+    });
+    return best;
+  }
+  function autofillFromHistory(idx,name){
+    const r=rows[curSec][idx];
+    if(!r)return;
+    const last=findLastEntry(name);
+    if(!last)return;
+    const card=document.querySelector(`.ex-card[data-idx="${idx}"]`);
+    if(!card)return;
+    let changed=false;
+    if(r.weight===''&&last.weight){
+      r.weight=last.weight; r.weightMode=last.weightMode||'total';
+      const wInp=card.querySelector('[data-field="weight"]'); if(wInp)wInp.value=last.weight;
+      const modeSel=card.querySelector('.weightmode-select'); if(modeSel)modeSel.value=r.weightMode;
+      changed=true;
+    }
+    if((r.sets===4||r.sets==='')&&last.sets){
+      r.sets=last.sets;
+      const sInp=card.querySelector('[data-field="sets"]'); if(sInp)sInp.value=last.sets;
+      changed=true;
+    }
+    if((r.reps===8||r.reps==='')&&last.reps){
+      r.reps=last.reps;
+      const rInp=card.querySelector('[data-field="reps"]'); if(rInp)rInp.value=last.reps;
+      changed=true;
+    }
+    if(changed)reVol(card,idx);
+  }
   function clearMetric(idx,field,btn){const card=btn.closest('.ex-card'),inp=card.querySelector(`[data-field="${field}"]`);if(inp)inp.value='';upd(idx,field,'');reVol(btn,idx);}
   function reVol(el,idx){const r=rows[curSec][idx];if(!r)return;const total=Number(r.weight||0)*(r.weightMode==='each'?2:1),v=(r.sets!==''&&r.reps!==''?Number(r.sets)*Number(r.reps)*total:0);const vEl=document.getElementById('vol-'+idx),note=document.getElementById('weight-note-'+idx);if(vEl){vEl.textContent=v>0?fmt(v):'—';vEl.className='vol-val'+(v>0?' active':'');}if(note)note.textContent=r.weightMode==='each'&&r.weight?fmt(total)+' lbs total load':'';}
   function addCard(){rows[curSec].push(blankRow());const idx=rows[curSec].length-1,el=makeCard(rows[curSec][idx],idx);document.getElementById('ex-cards').appendChild(el);el.scrollIntoView({behavior:'smooth',block:'nearest'});refreshIcons();}
@@ -1230,6 +1271,7 @@
     const subgroupSel = card.querySelector('.subgroup-select'); if (subgroupSel) subgroupSel.value = rows[curSec][idx].subgroup;
     const box = document.getElementById('sug-' + idx);
     if (box) { box.innerHTML = ''; box.classList.remove('open'); }
+    autofillFromHistory(idx, name);
   }
 
 
