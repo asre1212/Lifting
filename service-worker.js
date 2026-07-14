@@ -1,12 +1,11 @@
 /* ─────────────────────────────────────────────────────────────────────────
    LiftTrack Service Worker
    Strategy:
-     • App shell + CDN scripts  → cache-first, update in background
-     • Google Fonts CSS          → network-first (short timeout), fall to cache
-     • Everything else           → network-first, fall to cache
+     • App shell (incl. self-hosted fonts/libs) → cache-first, update in background
+     • Everything else                           → network-first, fall to cache
    ───────────────────────────────────────────────────────────────────────── */
 
-const VERSION     = 'lifttrack-v4-body-sections';
+const VERSION     = 'lifttrack-v5-selfhosted';
 const CACHE_SHELL = VERSION + '-shell';
 const CACHE_CDN   = VERSION + '-cdn';
 
@@ -17,14 +16,10 @@ const SHELL_ASSETS = [
   './manifest.json',
   './icon-192.png',
   './icon-512.png',
-];
-
-// CDN assets (cached after first fetch — not blocking install)
-const CDN_ASSETS = [
-  'https://unpkg.com/lucide@latest/dist/umd/lucide.min.js',
-  'https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js',
-  'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js',
-  'https://fonts.googleapis.com/css2?family=Geist+Mono:wght@300;400;500;600;700;800;900&display=swap',
+  './vendor/lucide.min.js',
+  './vendor/chart.umd.min.js',
+  './vendor/xlsx.full.min.js',
+  './fonts/geist-mono-latin.woff2',
 ];
 
 // ── Install ──────────────────────────────────────────────────────────────
@@ -34,10 +29,6 @@ self.addEventListener('install', event => {
       // Cache shell synchronously — app won't work offline without these
       const shellCache = await caches.open(CACHE_SHELL);
       await shellCache.addAll(SHELL_ASSETS);
-
-      // Pre-cache CDN assets in background (best-effort)
-      const cdnCache = await caches.open(CACHE_CDN);
-      await Promise.allSettled(CDN_ASSETS.map(url => cdnCache.add(url)));
 
       await self.skipWaiting();
     })()
@@ -77,7 +68,6 @@ self.addEventListener('fetch', event => {
 async function handleFetch(request) {
   const url = new URL(request.url);
   const isShell = SHELL_ASSETS.some(a => request.url.endsWith(a.replace('./', '')));
-  const isCDN   = CDN_ASSETS.includes(request.url) || url.hostname.includes('fonts.g');
 
   if (isShell) {
     // Cache-first for app shell; update in background
@@ -88,13 +78,6 @@ async function handleFetch(request) {
       return cached;
     }
     return fetchAndCache(CACHE_SHELL, request);
-  }
-
-  if (isCDN) {
-    // Cache-first for CDN — scripts rarely change
-    const cached = await caches.match(request);
-    if (cached) return cached;
-    return fetchAndCache(CACHE_CDN, request);
   }
 
   // Network-first for everything else
