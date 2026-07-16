@@ -7,6 +7,8 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="LiftTrack">
   <meta name="theme-color" content="#0D0D0D">
+  <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
+  <link rel="icon" type="image/png" sizes="512x512" href="icon-512.png">
   <link rel="manifest" href="manifest.json">
   <title>LiftTrack</title>
   <script src="vendor/lucide.min.js"></script>
@@ -832,34 +834,78 @@
   /* ──────────────────────────────────────
      HOME SCREEN ICON (generated via canvas)
   ────────────────────────────────────── */
+  // Append a rounded-rect subpath (works on older Safari without ctx.roundRect)
+  function iconRRect(ctx, x, y, w, h, r) {
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y,     x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x,     y + h, r);
+    ctx.arcTo(x,     y + h, x,     y,     r);
+    ctx.arcTo(x,     y,     x + w, y,     r);
+    ctx.closePath();
+  }
+
+  // Draws the LIFT app icon into ctx at the given square size.
+  // Full-bleed art so it also works as a maskable (Android) icon;
+  // the key mark stays inside the centre safe zone.
+  function drawLiftIcon(ctx, S) {
+    const k = S / 180;
+    ctx.clearRect(0, 0, S, S);
+
+    // Deep charcoal background with subtle vertical depth
+    const bg = ctx.createLinearGradient(0, 0, 0, S);
+    bg.addColorStop(0, '#1B1B1F');
+    bg.addColorStop(1, '#08080A');
+    ctx.fillStyle = bg;
+    ctx.fillRect(0, 0, S, S);
+
+    // Soft top highlight for a glassy feel
+    const hi = ctx.createRadialGradient(S * 0.5, S * 0.26, 0, S * 0.5, S * 0.26, S * 0.62);
+    hi.addColorStop(0, 'rgba(255,255,255,0.07)');
+    hi.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = hi;
+    ctx.fillRect(0, 0, S, S);
+
+    // Dumbbell geometry (based on a 180 grid, scaled by k)
+    const dumbbell = () => {
+      ctx.beginPath();
+      iconRRect(ctx, 63 * k, 82 * k, 54 * k, 16 * k, 8 * k);   // bar
+      iconRRect(ctx, 38 * k, 56 * k, 27 * k, 68 * k, 13 * k);  // left plate
+      iconRRect(ctx, 115 * k, 56 * k, 27 * k, 68 * k, 13 * k); // right plate
+    };
+
+    // Brand-gradient glow behind the mark
+    const grad = ctx.createLinearGradient(38 * k, 0, 142 * k, 0);
+    grad.addColorStop(0,    '#FF4F3B');
+    grad.addColorStop(0.34, '#5B4BFF');
+    grad.addColorStop(0.66, '#00B894');
+    grad.addColorStop(1,    '#FF3D7B');
+
+    ctx.save();
+    try { ctx.filter = `blur(${8 * k}px)`; } catch (e) {}
+    ctx.globalAlpha = 0.9;
+    ctx.fillStyle = grad;
+    dumbbell();
+    ctx.fill();
+    ctx.restore();
+
+    // Crisp white dumbbell on top
+    ctx.fillStyle = '#FFFFFF';
+    dumbbell();
+    ctx.fill();
+  }
+
   function generateIcon() {
+    // Prefer a real PNG file (more reliable when iOS caches the icon at
+    // "Add to Home Screen"); only fall back to the canvas version if absent.
+    const existing = document.querySelector('link[rel="apple-touch-icon"]');
+    if (existing && existing.getAttribute('href') && !existing.href.startsWith('data:')) return;
+
     const size = 180;
     const c = document.createElement('canvas');
     c.width = size; c.height = size;
-    const ctx = c.getContext('2d');
+    drawLiftIcon(c.getContext('2d'), size);
 
-    // Background
-    ctx.fillStyle = '#0D0D0D';
-    ctx.fillRect(0, 0, size, size);
-
-    // Coloured top bar (section colours)
-    const bar = ctx.createLinearGradient(0, 0, size, 0);
-    bar.addColorStop(0,    '#FF4F3B');
-    bar.addColorStop(0.33, '#5B4BFF');
-    bar.addColorStop(0.66, '#00B894');
-    bar.addColorStop(1,    '#FF3D7B');
-    ctx.fillStyle = bar;
-    ctx.fillRect(0, 0, size, 8);
-
-    // "LT" monogram
-    ctx.fillStyle = '#FFFFFF';
-    ctx.font = '900 82px monospace';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText('LT', size / 2, size / 2 + 6);
-
-    // Inject as apple-touch-icon
-    let link = document.querySelector('link[rel="apple-touch-icon"]');
+    let link = existing;
     if (!link) {
       link = document.createElement('link');
       link.rel = 'apple-touch-icon';
