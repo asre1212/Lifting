@@ -117,20 +117,21 @@
        HOME PAGE
     ────────────────────────────────────── */
     .home-header {
-      padding: 22px 0 6px;
-      display: flex; flex-direction: column; gap: 2px;
+      padding: 24px 0 6px;
+      margin-bottom: 24px;
+      display: flex; flex-direction: column; gap: 3px;
     }
     .home-greet {
-      font-size: 11px; font-weight: 500; color: var(--muted);
-      text-transform: uppercase; letter-spacing: 1.2px;
+      font-size: 11px; font-weight: 700; color: var(--back);
+      text-transform: uppercase; letter-spacing: 1.4px;
     }
     .home-name {
-      font-size: 36px; font-weight: 900; line-height: 1;
-      letter-spacing: -1.5px;
+      font-size: 42px; font-weight: 900; line-height: 1;
+      letter-spacing: -2px; margin-top: 2px;
     }
     .home-date {
-      font-size: 11px; font-weight: 500; color: var(--muted);
-      margin-top: 4px;
+      font-size: 11px; font-weight: 600; color: var(--muted);
+      margin-top: 6px; letter-spacing: .2px;
     }
 
     /* Bento stats */
@@ -165,13 +166,18 @@
     /* Section label row */
     .sec-label-row {
       display: flex; align-items: center; justify-content: space-between;
-      margin-bottom: 12px;
+      margin-bottom: 14px;
     }
     .sec-label {
-      font-size: 11px; font-weight: 800; text-transform: uppercase;
-      letter-spacing: 1.2px; color: var(--muted);
+      display: flex; align-items: center; gap: 9px;
+      font-size: 12.5px; font-weight: 800; text-transform: uppercase;
+      letter-spacing: .6px; color: var(--text);
     }
-    .sec-label-line { flex: 1; height: 1px; background: var(--border); margin-left: 12px; }
+    .sec-label::before {
+      content: ''; width: 4px; height: 15px; border-radius: 3px;
+      background: var(--accent, var(--back)); flex-shrink: 0;
+    }
+    .sec-label-line { flex: 1; height: 1px; background: var(--border); margin-left: 14px; }
 
     /* Muscle group cards */
     .muscle-card {
@@ -526,7 +532,8 @@
     }
 
 
-    .mc-subgroup { padding:10px 18px 5px; font-size:9px; font-weight:900; letter-spacing:1.1px; text-transform:uppercase; color:var(--muted); background:var(--bg); border-top:1px solid var(--border); }
+    .mc-subgroup { display:flex; align-items:center; gap:7px; padding:9px 18px 5px; font-size:10px; font-weight:900; letter-spacing:.9px; text-transform:uppercase; color:#6E6E64; background:var(--bg); border-top:1px solid var(--border); }
+    .mc-subgroup::before { content:''; width:5px; height:5px; border-radius:50%; background:var(--muted); flex-shrink:0; }
     .mc-actions { display:flex; gap:5px; align-items:center; }
     .mc-move-btn { width:26px; height:26px; border-radius:7px; border:1.5px solid var(--border); background:transparent; color:var(--muted); display:flex; align-items:center; justify-content:center; cursor:pointer; }
     .mc-move-bar { display:none; align-items:center; gap:7px; padding:10px 12px; background:#F1F7FF; border-top:1px solid #CDE2FF; }
@@ -608,27 +615,6 @@
       <div class="home-date" id="home-date"></div>
     </div>
 
-    <div class="bento">
-      <div class="bento-main">
-        <div class="blbl">Total Sessions</div>
-        <div class="bval" id="s-total">0</div>
-      </div>
-      <div class="bento-sm">
-        <i data-lucide="calendar-check" width="16" height="16" class="bico"></i>
-        <div>
-          <div class="bval" id="s-week" style="color:var(--legs)">0</div>
-          <div class="blbl">This Week</div>
-        </div>
-      </div>
-      <div class="bento-sm">
-        <i data-lucide="flame" width="16" height="16" class="bico" style="color:var(--core)"></i>
-        <div>
-          <div class="bval" id="s-streak" style="color:var(--core)">0</div>
-          <div class="blbl">Streak</div>
-        </div>
-      </div>
-    </div>
-
     <div class="nudge-card" id="backup-nudge" style="display:none">
       <i data-lucide="alert-triangle" width="18" height="18"></i>
       <div class="nudge-info">
@@ -640,13 +626,13 @@
     </div>
 
     <div class="sec-label-row">
-      <span class="sec-label">Last 3 months</span>
+      <span class="sec-label" style="--accent:var(--legs)">Last 3 months</span>
       <span class="sec-label-line"></span>
     </div>
     <div id="home-muscles"></div>
 
     <div class="sec-label-row" style="margin-top:8px">
-      <span class="sec-label">Backup &amp; Transfer</span>
+      <span class="sec-label" style="--accent:var(--back)">Backup &amp; Transfer</span>
       <span class="sec-label-line"></span>
     </div>
     <div class="backup-card">
@@ -715,6 +701,21 @@
       <div class="page-sub">Track your lifts</div>
     </div>
 
+    <div class="rest-card">
+      <div class="rest-head">
+        <i data-lucide="timer" width="14" height="14"></i>
+        <span class="rest-lbl">Rest Timer</span>
+        <span class="rest-count" id="rest-count"></span>
+      </div>
+      <div class="rest-chips">
+        <button class="rest-chip" onclick="startRest(60)">1:00</button>
+        <button class="rest-chip" onclick="startRest(90)">1:30</button>
+        <button class="rest-chip" onclick="startRest(120)">2:00</button>
+        <button class="rest-chip" onclick="startRest(180)">3:00</button>
+        <button class="rest-chip stop" id="rest-stop" style="display:none" onclick="stopRest()">Stop</button>
+      </div>
+    </div>
+
     <div class="date-bar">
       <i data-lucide="calendar-days" width="16" height="16"></i>
       <input type="date" id="log-date">
@@ -751,21 +752,6 @@
       <i data-lucide="check-circle" width="18" height="18"></i>
       SAVE WORKOUT
     </button>
-
-    <div class="rest-card">
-      <div class="rest-head">
-        <i data-lucide="timer" width="14" height="14"></i>
-        <span class="rest-lbl">Rest Timer</span>
-        <span class="rest-count" id="rest-count"></span>
-      </div>
-      <div class="rest-chips">
-        <button class="rest-chip" onclick="startRest(60)">1:00</button>
-        <button class="rest-chip" onclick="startRest(90)">1:30</button>
-        <button class="rest-chip" onclick="startRest(120)">2:00</button>
-        <button class="rest-chip" onclick="startRest(180)">3:00</button>
-        <button class="rest-chip stop" id="rest-stop" style="display:none" onclick="stopRest()">Stop</button>
-      </div>
-    </div>
   </div>
 
   <!-- ═══════════════ TRENDS ═══════════════ -->
@@ -1095,7 +1081,7 @@
      HOME
   ────────────────────────────────────── */
   function renderHome(){
-    const ws=getWO(),now=new Date();document.getElementById('s-total').textContent=ws.length;const wkAgo=new Date(now);wkAgo.setDate(wkAgo.getDate()-7);document.getElementById('s-week').textContent=ws.filter(w=>new Date(w.date)>=wkAgo).length;document.getElementById('s-streak').textContent=streak(ws);const cut=new Date(now);cut.setMonth(cut.getMonth()-3);const recent=ws.filter(w=>new Date(w.date+'T00:00:00')>=cut),wrap=document.getElementById('home-muscles');wrap.innerHTML='';
+    const ws=getWO(),now=new Date();const cut=new Date(now);cut.setMonth(cut.getMonth()-3);const recent=ws.filter(w=>new Date(w.date+'T00:00:00')>=cut),wrap=document.getElementById('home-muscles');wrap.innerHTML='';
     Object.keys(SECS).forEach(sec=>{const info=SECS[sec],allE=[];recent.forEach(w=>(w.entries||[]).filter(e=>e.section===sec).forEach(e=>allE.push({...e,date:w.date,subgroup:e.subgroup||inferSubgroup(e.exercise,sec)})));const names=[...new Set(allE.map(e=>e.exercise))],card=document.createElement('div');card.className='muscle-card';card.innerHTML=`<div class="mc-header"><div class="mc-icon-wrap" style="background:${info.color}18"><i data-lucide="${info.icon}" width="18" height="18" style="color:${info.color}"></i></div><div><div class="mc-title">${info.label.toUpperCase()}</div></div><div class="mc-count">${names.length} move${names.length!==1?'s':''}</div></div><div class="mc-divider"></div><div class="mc-ex-list"></div>`;wrap.appendChild(card);const list=card.querySelector('.mc-ex-list');if(!names.length){list.innerHTML='<div class="mc-empty">No workouts yet — start logging!</div>';return;}
       const groups={};names.forEach(name=>{const latest=allE.filter(e=>e.exercise===name).sort((a,b)=>a.date.localeCompare(b.date)).slice(-1)[0],g=latest.subgroup||inferSubgroup(name,sec);(groups[g]||(groups[g]=[])).push(name);});
       const order=[...(SUBGROUPS[sec]||[]),...Object.keys(groups).filter(g=>!(SUBGROUPS[sec]||[]).includes(g))];order.forEach(group=>{if(!groups[group]?.length)return;const head=document.createElement('div');head.className='mc-subgroup';head.textContent=group;list.appendChild(head);groups[group].sort().forEach(name=>renderHomeExercise(list,allE,name,sec,info,now));});
