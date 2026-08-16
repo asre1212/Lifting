@@ -20,6 +20,18 @@ final class WebViewController: UIViewController {
         super.viewDidLoad()
         buildWebView()
         loadApp()
+
+        RestTimerController.shared.clearOrphanedActivities()
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(appDidBecomeActive),
+            name: UIApplication.didBecomeActiveNotification,
+            object: nil
+        )
+    }
+
+    @objc private func appDidBecomeActive() {
+        RestTimerController.shared.refreshOnForeground()
     }
 
     override var preferredStatusBarStyle: UIStatusBarStyle { .lightContent }
@@ -33,6 +45,7 @@ final class WebViewController: UIViewController {
         controller.add(self, name: Channel.store)
         controller.add(self, name: Channel.share)
         controller.add(self, name: Channel.haptics)
+        controller.add(self, name: Channel.restTimer)
         controller.addUserScript(makeBridgeScript())
 
         let configuration = WKWebViewConfiguration()
@@ -126,6 +139,7 @@ private enum Channel {
     static let store = "store"
     static let share = "share"
     static let haptics = "haptics"
+    static let restTimer = "restTimer"
 }
 
 extension WebViewController: WKScriptMessageHandler {
@@ -133,10 +147,11 @@ extension WebViewController: WKScriptMessageHandler {
     func userContentController(_ userContentController: WKUserContentController,
                                didReceive message: WKScriptMessage) {
         switch message.name {
-        case Channel.store:   handleStore(message.body)
-        case Channel.share:   handleShare(message.body)
-        case Channel.haptics: handleHaptics(message.body)
-        default:              break
+        case Channel.store:     handleStore(message.body)
+        case Channel.share:     handleShare(message.body)
+        case Channel.haptics:   handleHaptics(message.body)
+        case Channel.restTimer: handleRestTimer(message.body)
+        default:                break
         }
     }
 
@@ -234,6 +249,35 @@ extension WebViewController: WKScriptMessageHandler {
         """
         webView.evaluateJavaScript(script) { _, error in
             if let error { NSLog("[LiftTrack] share callback failed: \(error.localizedDescription)") }
+        }
+    }
+
+    // MARK: Rest timer
+
+    private func handleRestTimer(_ body: Any) {
+        guard let payload = body as? [String: Any], let op = payload["op"] as? String else { return }
+
+        switch op {
+        case "start":
+            let seconds = (payload["seconds"] as? NSNumber)?.intValue ?? 0
+            let exercise = (payload["exercise"] as? String) ?? ""
+            let chime = (payload["chime"] as? Bool) ?? false
+            RestTimerController.shared.start(seconds: seconds, exercise: exercise, chime: chime)
+
+        case "stop":
+            RestTimerController.shared.stop()
+
+        case "requestChime":
+            RestTimerController.shared.requestChimeAuthorization { [weak self] granted in
+                self?.webView.evaluateJavaScript("window.__ltChimeAuth(\(granted));") { _, error in
+                    if let error {
+                        NSLog("[LiftTrack] chime auth callback failed: \(error.localizedDescription)")
+                    }
+                }
+            }
+
+        default:
+            break
         }
     }
 
