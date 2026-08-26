@@ -420,6 +420,112 @@
     .save-btn:active { transform: scale(.97); background: #2a2a2a; }
 
     /* ──────────────────────────────────────
+       QUICK LOG (prior exercises)
+    ────────────────────────────────────── */
+    .ql-wrap { margin: 0 0 10px; }
+    .ql-toggle {
+      width: 100%; display: flex; align-items: center; gap: 9px;
+      padding: 12px 14px; border-radius: 14px;
+      border: 1.5px solid var(--border); background: var(--card);
+      font-family: inherit; cursor: pointer;
+      transition: border-color .18s, transform .12s;
+    }
+    .ql-toggle:active { transform: scale(.99); }
+    .ql-toggle.open { border-color: var(--back); }
+    .ql-toggle > svg:first-child { color: var(--back); flex-shrink: 0; }
+    .ql-toggle-lbl { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .9px; color: var(--text); flex-shrink: 0; }
+    .ql-toggle-sub { flex: 1; text-align: left; font-size: 10px; font-weight: 600; color: var(--muted); letter-spacing: .2px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+    .ql-badge { background: var(--back); color: #fff; border-radius: 50px; padding: 3px 8px; font-size: 10px; font-weight: 800; letter-spacing: -.1px; flex-shrink: 0; }
+    .ql-chev { color: var(--muted); transition: transform .25s; flex-shrink: 0; }
+    .ql-toggle.open .ql-chev { transform: rotate(180deg); color: var(--back); }
+
+    .ql-panel {
+      max-height: 0; overflow: hidden; opacity: 0;
+      transition: max-height .3s cubic-bezier(.4,0,.2,1), opacity .2s, margin-top .3s;
+    }
+    .ql-panel.open { max-height: 620px; opacity: 1; margin-top: 8px; }
+    .ql-inner {
+      background: var(--card); border: 1.5px solid var(--border);
+      border-radius: 14px; padding: 11px 11px 10px;
+    }
+    .ql-search {
+      display: flex; align-items: center; gap: 8px;
+      border: 1.5px solid var(--border); border-radius: 10px;
+      background: var(--bg); padding: 8px 11px;
+    }
+    .ql-search svg { color: var(--muted); flex-shrink: 0; }
+    .ql-search input {
+      flex: 1; min-width: 0; border: none; background: transparent;
+      font-family: inherit; font-size: 16px; font-weight: 700;
+      color: var(--text); outline: none; letter-spacing: -.3px;
+    }
+    .ql-search input::placeholder { color: var(--muted); font-weight: 500; font-size: 13px; }
+
+    .ql-scope { display: flex; gap: 6px; margin-top: 9px; }
+    .ql-scope-btn {
+      flex: 1; padding: 8px 6px; border-radius: 9px;
+      border: 1.5px solid var(--border); background: var(--bg);
+      font-family: inherit; font-size: 11px; font-weight: 800;
+      color: var(--muted); cursor: pointer; letter-spacing: -.1px;
+      transition: all .15s; white-space: nowrap;
+    }
+    .ql-scope-btn:active { transform: scale(.96); }
+    .ql-scope-btn.on { background: var(--back); border-color: transparent; color: #fff; }
+    .ql-scope-btn.ghost { flex: 0 0 auto; padding: 8px 11px; color: var(--text); }
+    .ql-scope-btn.ghost:active { border-color: var(--back); color: var(--back); }
+
+    .ql-list { margin-top: 9px; max-height: 306px; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+    .ql-item {
+      display: flex; align-items: center; gap: 10px;
+      padding: 9px 8px; border-radius: 10px; cursor: pointer;
+      border: 1.5px solid transparent; transition: background .12s, border-color .12s;
+    }
+    .ql-item + .ql-item { margin-top: 2px; }
+    .ql-item:active { background: var(--bg); }
+    .ql-item.on { background: #F3F1FF; border-color: var(--back); }
+    .ql-item.in { opacity: .45; cursor: default; }
+    .ql-item input { position: absolute; opacity: 0; pointer-events: none; width: 0; height: 0; }
+    .ql-box {
+      width: 20px; height: 20px; border-radius: 6px; flex-shrink: 0;
+      border: 1.5px solid var(--border); background: var(--card);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 12px; font-weight: 900; color: transparent; line-height: 1;
+      transition: all .15s;
+    }
+    .ql-item.on .ql-box { background: var(--back); border-color: var(--back); color: #fff; }
+    .ql-main { flex: 1; min-width: 0; }
+    .ql-name {
+      font-size: 13px; font-weight: 800; color: var(--text);
+      letter-spacing: -.2px; display: flex; align-items: center; gap: 6px;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .ql-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+    .ql-sub { font-size: 10px; font-weight: 600; color: var(--muted); margin-top: 3px; letter-spacing: .2px; }
+    .ql-right { text-align: right; flex-shrink: 0; }
+    .ql-wt { font-size: 11px; font-weight: 800; letter-spacing: -.2px; }
+    .ql-when { font-size: 9px; font-weight: 700; color: var(--muted); margin-top: 3px; letter-spacing: .3px; text-transform: uppercase; }
+    .ql-tag { font-size: 8px; font-weight: 800; letter-spacing: .6px; color: var(--legs); text-transform: uppercase; }
+    .ql-empty { padding: 22px 10px; text-align: center; font-size: 12px; font-weight: 600; color: var(--muted); }
+
+    .ql-foot { display: flex; gap: 7px; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border); }
+    .ql-clear {
+      padding: 12px 14px; border-radius: 11px;
+      border: 1.5px solid var(--border); background: transparent;
+      font-family: inherit; font-size: 11px; font-weight: 800;
+      color: var(--muted); cursor: pointer; letter-spacing: .3px;
+    }
+    .ql-clear:active { transform: scale(.96); }
+    .ql-add {
+      flex: 1; padding: 12px; border-radius: 11px; border: none;
+      background: var(--text); color: #fff; font-family: inherit;
+      font-size: 12px; font-weight: 800; cursor: pointer; letter-spacing: .3px;
+      display: flex; align-items: center; justify-content: center; gap: 7px;
+      transition: transform .15s, opacity .15s;
+    }
+    .ql-add:active { transform: scale(.97); }
+    .ql-add:disabled { opacity: .35; cursor: default; transform: none; }
+
+    /* ──────────────────────────────────────
        TRENDS PAGE
     ────────────────────────────────────── */
     .trends-header { padding: 22px 0 4px; }
@@ -744,6 +850,37 @@
       <button class="sec-tab" data-sec="general" onclick="setSec('general')"><i data-lucide="activity" width="13" height="13"></i> General</button>
     </div>
 
+    <div class="ql-wrap">
+      <button class="ql-toggle" id="ql-toggle" onclick="toggleQuickLog()" aria-expanded="false" aria-controls="ql-panel">
+        <i data-lucide="list-checks" width="16" height="16"></i>
+        <span class="ql-toggle-lbl">Quick Log</span>
+        <span class="ql-toggle-sub" id="ql-toggle-sub"></span>
+        <span class="ql-badge" id="ql-badge" style="display:none">0</span>
+        <i data-lucide="chevron-down" width="16" height="16" class="ql-chev"></i>
+      </button>
+      <div class="ql-panel" id="ql-panel">
+        <div class="ql-inner">
+          <div class="ql-search">
+            <i data-lucide="search" width="14" height="14"></i>
+            <input id="ql-search" type="text" placeholder="Search prior exercises…" autocomplete="off" oninput="qlSearch(this.value)">
+          </div>
+          <div class="ql-scope">
+            <button class="ql-scope-btn" data-scope="sec" onclick="qlSetScope('sec')">This section</button>
+            <button class="ql-scope-btn" data-scope="all" onclick="qlSetScope('all')">All sections</button>
+            <button class="ql-scope-btn ghost" onclick="qlPickLast()">Last session</button>
+          </div>
+          <div class="ql-list" id="ql-list"></div>
+          <div class="ql-foot">
+            <button class="ql-clear" onclick="qlClear()">Clear</button>
+            <button class="ql-add" id="ql-add" onclick="qlAddSelected()" disabled>
+              <i data-lucide="plus" width="14" height="14"></i>
+              <span id="ql-add-lbl">Add to log</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <div id="ex-cards"></div>
 
     <button class="add-btn" onclick="addCard()">
@@ -1027,7 +1164,7 @@
   ────────────────────────────────────── */
   function blankRow(){return {exercise:'',subgroup:'',sets:4,reps:8,weight:'',weightMode:'total',duration:''};}
   function subgroupOptions(sec,selected){return (SUBGROUPS[sec]||[]).map(g=>`<option value="${g}" ${g===selected?'selected':''}>${g}</option>`).join('');}
-  function renderCards(){const wrap=document.getElementById('ex-cards');wrap.innerHTML='';if(!rows[curSec].length)rows[curSec].push(blankRow());rows[curSec].forEach((r,i)=>wrap.appendChild(makeCard(r,i)));refreshIcons();}
+  function renderCards(){const wrap=document.getElementById('ex-cards');wrap.innerHTML='';if(!rows[curSec].length)rows[curSec].push(blankRow());rows[curSec].forEach((r,i)=>wrap.appendChild(makeCard(r,i)));renderQuickLog();refreshIcons();}
   function makeCard(r,idx){
     r.weightMode=r.weightMode||'total'; r.subgroup=r.subgroup||inferSubgroup(r.exercise,curSec);
     const total=(Number(r.weight||0)*(r.weightMode==='each'?2:1)),vol=(r.sets!==''&&r.reps!==''?Number(r.sets)*Number(r.reps)*total:0);
@@ -1089,8 +1226,148 @@
   }
   function clearMetric(idx,field,btn){const card=btn.closest('.ex-card'),inp=card.querySelector(`[data-field="${field}"]`);if(inp)inp.value='';upd(idx,field,'');reVol(btn,idx);}
   function reVol(el,idx){const r=rows[curSec][idx];if(!r)return;const total=Number(r.weight||0)*(r.weightMode==='each'?2:1),v=(r.sets!==''&&r.reps!==''?Number(r.sets)*Number(r.reps)*total:0);const vEl=document.getElementById('vol-'+idx),note=document.getElementById('weight-note-'+idx);if(vEl){vEl.textContent=v>0?fmt(v):'—';vEl.className='vol-val'+(v>0?' active':'');}if(note)note.textContent=r.weightMode==='each'&&r.weight?fmt(total)+' lbs total load':'';}
-  function addCard(){rows[curSec].push(blankRow());const idx=rows[curSec].length-1,el=makeCard(rows[curSec][idx],idx);document.getElementById('ex-cards').appendChild(el);el.scrollIntoView({behavior:'smooth',block:'nearest'});refreshIcons();}
+  function addCard(){rows[curSec].push(blankRow());const idx=rows[curSec].length-1,el=makeCard(rows[curSec][idx],idx);document.getElementById('ex-cards').appendChild(el);el.scrollIntoView({behavior:'smooth',block:'nearest'});renderQuickLog();refreshIcons();}
   function delCard(idx){if(rows[curSec].length<=1){rows[curSec][0]=blankRow();renderCards();return;}rows[curSec].splice(idx,1);renderCards();}
+
+  /* ──────────────────────────────────────
+     LOG — quick log (prior exercises)
+  ────────────────────────────────────── */
+  let qlOpen = false, qlScope = 'sec', qlQuery = '';
+  const qlSel = new Set();
+  let _qlShown = [];
+
+  // Latest logged entry per section+exercise, most recent first.
+  function priorExercises(){
+    const map = new Map();
+    getWO().forEach(w=>{
+      (w.entries||[]).forEach(e=>{
+        const name=(e.exercise||'').trim(); if(!name) return;
+        const sec=SECS[e.section]?e.section:'general';
+        const key=sec+'|'+name.toLowerCase();
+        const prev=map.get(key);
+        if(prev && prev.date>=w.date) return;
+        map.set(key,{key,name,section:sec,date:w.date,
+          sets:e.sets??'', reps:e.reps??'', weight:e.weight||'',
+          weightMode:e.weightMode||'total', duration:e.duration??'',
+          subgroup:e.subgroup||inferSubgroup(name,sec)});
+      });
+    });
+    return [...map.values()].sort((a,b)=>b.date.localeCompare(a.date)||a.name.localeCompare(b.name));
+  }
+  function qlAgo(ds){
+    const d=new Date(ds+'T00:00:00'), now=new Date();
+    const days=Math.floor((new Date(today()+'T00:00:00')-d)/86400000);
+    if(days<=0)return 'Today';
+    if(days===1)return 'Yesterday';
+    if(days<7)return days+'d ago';
+    return d.toLocaleDateString('en-US',{month:'short',day:'numeric',...(d.getFullYear()!==now.getFullYear()?{year:'2-digit'}:{})});
+  }
+  function qlInLog(item){
+    return (rows[item.section]||[]).some(r=>(r.exercise||'').trim().toLowerCase()===item.name.toLowerCase());
+  }
+  function toggleQuickLog(){
+    qlOpen=!qlOpen;
+    document.getElementById('ql-toggle').classList.toggle('open',qlOpen);
+    document.getElementById('ql-toggle').setAttribute('aria-expanded',qlOpen?'true':'false');
+    document.getElementById('ql-panel').classList.toggle('open',qlOpen);
+    if(qlOpen)renderQuickLog();else updateQuickLogHead();
+  }
+  function closeQuickLog(){ if(qlOpen)toggleQuickLog(); }
+  function qlSearch(v){ qlQuery=v; renderQuickLog(); }
+  function qlSetScope(scope){ qlScope=scope; renderQuickLog(); }
+  function qlClear(){ qlSel.clear(); renderQuickLog(); }
+  function qlTog(i){
+    const item=_qlShown[i]; if(!item||qlInLog(item))return;
+    if(qlSel.has(item.key))qlSel.delete(item.key);else qlSel.add(item.key);
+    renderQuickLog();
+  }
+  function qlPickLast(){
+    const ws=getWO();
+    if(!ws.length){toast('No prior workouts yet');return;}
+    const lastDate=ws.reduce((a,w)=>w.date>a?w.date:a,ws[0].date);
+    const keys=new Set();
+    ws.filter(w=>w.date===lastDate).forEach(w=>(w.entries||[]).forEach(e=>{
+      const name=(e.exercise||'').trim(); if(!name)return;
+      keys.add((SECS[e.section]?e.section:'general')+'|'+name.toLowerCase());
+    }));
+    let n=0;
+    priorExercises().forEach(i=>{ if(keys.has(i.key)&&!qlInLog(i)){qlSel.add(i.key);n++;} });
+    qlScope='all'; qlQuery='';
+    const s=document.getElementById('ql-search'); if(s)s.value='';
+    renderQuickLog();
+    toast(n?`${n} from ${qlAgo(lastDate).toLowerCase()} selected`:'Already in your log');
+  }
+  function updateQuickLogHead(){
+    const sub=document.getElementById('ql-toggle-sub'),badge=document.getElementById('ql-badge');
+    if(!sub||!badge)return;
+    const all=priorExercises(), n=qlSel.size;
+    sub.textContent=!all.length?'No history yet'
+      :n?`${n} ready to add`
+      :`Check off from ${all.length} prior exercise${all.length>1?'s':''}`;
+    badge.style.display=n?'':'none';
+    badge.textContent=n;
+  }
+  function renderQuickLog(){
+    updateQuickLogHead();
+    if(!qlOpen)return;
+    document.querySelectorAll('.ql-scope-btn[data-scope]').forEach(b=>b.classList.toggle('on',b.dataset.scope===qlScope));
+    const q=qlQuery.trim().toLowerCase();
+    _qlShown=priorExercises()
+      .filter(i=>qlScope==='all'||i.section===curSec)
+      .filter(i=>!q||i.name.toLowerCase().includes(q));
+    const list=document.getElementById('ql-list');
+    if(!_qlShown.length){
+      list.innerHTML=`<div class="ql-empty">${priorExercises().length
+        ?'No matches — try “All sections”.'
+        :'No prior exercises yet — save a workout first.'}</div>`;
+    }else{
+      list.innerHTML=_qlShown.map((i,idx)=>{
+        const on=qlSel.has(i.key), inLog=qlInLog(i), color=SECS[i.section].color;
+        const hasSR=i.sets!==''&&i.sets!==null&&i.reps!==''&&i.reps!==null;
+        const dur=i.duration!==''&&i.duration!==null?`${i.duration} min`:'';
+        const sr=[hasSR?`${i.sets} sets × ${i.reps} reps`:'',dur].filter(Boolean).join(' · ')||'No sets logged';
+        return `<label class="ql-item${on?' on':''}${inLog?' in':''}">
+          <input type="checkbox" ${on?'checked':''} ${inLog?'disabled':''} onchange="qlTog(${idx})">
+          <span class="ql-box">✓</span>
+          <span class="ql-main">
+            <span class="ql-name">${qlScope==='all'?`<span class="ql-dot" style="background:${color}"></span>`:''}${esc(i.name)}</span>
+            <span class="ql-sub">${sr}${inLog?' · <span class="ql-tag">In log</span>':''}</span>
+          </span>
+          <span class="ql-right">
+            <div class="ql-wt" style="color:${color}">${weightLabel(i)}</div>
+            <div class="ql-when">${qlAgo(i.date)}</div>
+          </span>
+        </label>`;
+      }).join('');
+    }
+    const btn=document.getElementById('ql-add'),lbl=document.getElementById('ql-add-lbl');
+    const n=qlSel.size;
+    btn.disabled=!n;
+    lbl.textContent=n?`Add ${n} exercise${n>1?'s':''}`:'Add to log';
+  }
+  // Turn the checked prior exercises into normal log cards, prefilled with
+  // the weights/sets/reps from the last time each was logged.
+  function qlAddSelected(){
+    const chosen=priorExercises().filter(i=>qlSel.has(i.key));
+    if(!chosen.length)return;
+    let added=0,skipped=0,jumpSec=null;
+    chosen.forEach(i=>{
+      if(qlInLog(i)){skipped++;return;}
+      const list=rows[i.section];
+      const row={exercise:i.name,subgroup:i.subgroup,sets:i.sets,reps:i.reps,
+                 weight:i.weight,weightMode:i.weightMode,duration:i.duration};
+      if(list.length===1&&!(list[0].exercise||'').trim()&&list[0].weight==='')list[0]=row;
+      else list.push(row);
+      added++;
+      if(i.section===curSec)jumpSec=curSec;
+      else if(!jumpSec)jumpSec=i.section;
+    });
+    qlSel.clear();
+    closeQuickLog();
+    setSec(jumpSec||curSec);
+    if(added)toast(`✓ ${added} added with prior weights${skipped?` · ${skipped} already in log`:''}`);
+    else toast('Already in your log');
+  }
 
   /* ──────────────────────────────────────
      LOG — save
@@ -1103,7 +1380,7 @@
     const ws=getWO();
     if(editingWO){const ids=new Set(editingWO.ids);for(let i=ws.length-1;i>=0;i--)if(ids.has(ws[i].id))ws.splice(i,1);editingWO=null;updateEditBanner();}
     ws.push({id:uid(),date,entries});setWO(ws);
-    const ex=getEx();entries.forEach(e=>{if(!ex[e.section].includes(e.exercise))ex[e.section].push(e.exercise);});setEx(ex);rebuildDL();Object.keys(rows).forEach(k=>rows[k]=[]);document.getElementById('log-date').value=today();setSec(curSec);toast(`✓ ${entries.length} exercise${entries.length>1?'s':''} saved`);setTimeout(()=>goTab('home'),850);
+    const ex=getEx();entries.forEach(e=>{if(!ex[e.section].includes(e.exercise))ex[e.section].push(e.exercise);});setEx(ex);rebuildDL();Object.keys(rows).forEach(k=>rows[k]=[]);qlSel.clear();closeQuickLog();document.getElementById('log-date').value=today();setSec(curSec);toast(`✓ ${entries.length} exercise${entries.length>1?'s':''} saved`);setTimeout(()=>goTab('home'),850);
   }
 
   /* ──────────────────────────────────────
@@ -1485,6 +1762,7 @@
   function cancelEdit(){
     editingWO=null;
     Object.keys(rows).forEach(k=>rows[k]=[]);
+    qlSel.clear();
     document.getElementById('log-date').value=today();
     updateEditBanner();
     setSec(curSec);
