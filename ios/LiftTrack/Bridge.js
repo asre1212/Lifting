@@ -169,21 +169,28 @@
     return true;
   });
 
-  /* ── Rest timer: Dynamic Island + background chime ──────────────────────
+  /* ── Rest timer: Lock Screen session + background chime ────────────────
      The page drives its rest timer with setInterval, which iOS freezes the
      moment the app leaves the foreground — so a rest that ends while the
      phone is locked never counts down and never beeps. We wrap the page's
      own global timer functions (they're globals because the rest chips call
      them from inline onclick handlers) and hand the end time to native,
-     which schedules a Live Activity and a local notification against the
-     wall clock instead.                                                   */
+     which runs a Live Activity and a local notification against the wall
+     clock instead.
+
+     Native owns the session too: opening the Log page raises a Live Activity
+     that stays on the Lock Screen with its own 1 / 2 / 3 minute buttons and a
+     "Complete Workout" button, and those call back down here.              */
 
   var CHIME_KEY = 'lt_native_chime';
   var restEndsAt = null;
   var suppressNextBeep = false;
   var chimeAuthResolve = null;
+  var sessionLive = false;
+  var lastExercise = '';
 
-  function chimeEnabled() { return shim.getItem(CHIME_KEY) === '1'; }
+  // Absent means on: the chime is the default, the toggle opts out of it.
+  function chimeEnabled() { return shim.getItem(CHIME_KEY) !== '0'; }
 
   define(window, '__ltChimeAuth', function (granted) {
     var resolve = chimeAuthResolve;
@@ -201,7 +208,19 @@
     });
   }
 
-  /// Best-effort label for the island: the last exercise the user named.
+  /// How many exercises on the Log page actually have a name typed in.
+  function namedExerciseCount() {
+    var count = 0;
+    try {
+      var inputs = document.querySelectorAll('#page-log .ex-inp');
+      for (var i = 0; i < inputs.length; i++) {
+        if ((inputs[i].value || '').trim()) count++;
+      }
+    } catch (e) { /* treat as none */ }
+    return count;
+  }
+
+  /// Best-effort label for the Lock Screen: the last exercise the user named.
   function currentExercise() {
     try {
       var inputs = document.querySelectorAll('#page-log .ex-inp');
@@ -213,22 +232,113 @@
     return '';
   }
 
+  function logPageOpen() {
+    var page = document.getElementById('page-log');
+    return !!(page && page.classList.contains('active'));
+  }
+
+  /* ── Session ────────────────────────────────────────────────────────────
+     The Live Activity is up for as long as the user is on the Log page, so
+     the rest buttons are one glance away even mid-set.                     */
+
+  function startSession() {
+    if (sessionLive) return;
+    sessionLive = true;
+    lastExercise = currentExercise();
+    post('restTimer', { op: 'session', exercise: lastExercise });
+  }
+
+  function endSession() {
+    if (!sessionLive) return;
+    sessionLive = false;
+    restEndsAt = null;
+    lastExercise = '';
+    post('restTimer', { op: 'endSession' });
+  }
+
+  function syncExercise() {
+    if (!sessionLive) return;
+    var name = currentExercise();
+    if (name === lastExercise) return;
+    lastExercise = name;
+    post('restTimer', { op: 'exercise', exercise: name });
+  }
+
+  /* ── Callbacks from native ───────────────────────────────────────────── */
+
+  define(window, '__ltShowLog', function () {
+    try {
+      if (typeof window.goTab === 'function' && !logPageOpen()) window.goTab('log');
+      startSession();
+    } catch (e) { /* nothing sensible to do */ }
+  });
+
+  /// "Complete Workout" on the Lock Screen: the session is over and the user
+  /// is back in the app to write the sets down.
+  define(window, '__ltCompleteWorkout', function () {
+    restEndsAt = null;
+    lastExercise = '';
+    // Native has already taken the activity down. Held "live" across the hop to
+    // the Log page so the wrapped goTab below doesn't put a fresh one straight
+    // back up; the next rest the user starts raises it again.
+    sessionLive = true;
+    try {
+      if (typeof window.stopRest === 'function') window.stopRest();
+      if (typeof window.goTab === 'function') window.goTab('log');
+      if (typeof window.toast === 'function') window.toast('✓ Workout done — log your sets');
+    } catch (e) { /* nothing sensible to do */ }
+    sessionLive = false;
+  });
+
+  /// A rest was started (or ran out) on the Lock Screen while the page was
+  /// frozen — put the in-app counter back on the same clock.
+  define(window, '__ltRestSync', function (seconds) {
+    var remain = Math.max(0, Math.round(Number(seconds) || 0));
+    try {
+      if (remain > 0) {
+        if (typeof window.__ltStartRestLocal === 'function') {
+          suppressNextBeep = false;
+          restEndsAt = Date.now() + remain * 1000;
+          window.__ltStartRestLocal(remain);
+        }
+      } else if (restEndsAt && typeof window.stopRest === 'function') {
+        // Ran out while we were away: native already chimed for it.
+        restEndsAt = null;
+        suppressNextBeep = true;
+        window.stopRest();
+      }
+    } catch (e) { /* nothing sensible to do */ }
+  });
+
+  var restWrapped = false;
+  var sessionWrapped = false;
+
   function wrapRestTimer() {
+    if (restWrapped) return true;
     if (typeof window.startRest !== 'function' || typeof window.stopRest !== 'function') return false;
+    restWrapped = true;
 
     var originalStart = window.startRest;
     var originalStop = window.stopRest;
     var originalBeep = typeof window.restBeep === 'function' ? window.restBeep : null;
+
+    // Lets __ltRestSync restart the page's own counter without reporting a
+    // rest back to native that native started itself.
+    define(window, '__ltStartRestLocal', function (seconds) {
+      return originalStart.call(window, seconds);
+    });
 
     window.startRest = function (seconds) {
       var result = originalStart.apply(this, arguments);
       var duration = Number(seconds) || 0;
       restEndsAt = Date.now() + duration * 1000;
       suppressNextBeep = false;
+      startSession();
+      lastExercise = currentExercise();
       post('restTimer', {
         op: 'start',
         seconds: duration,
-        exercise: currentExercise(),
+        exercise: lastExercise,
         chime: chimeEnabled(),
       });
       return result;
@@ -259,6 +369,42 @@
     return true;
   }
 
+  /// The session follows the Log page: opening it raises the Live Activity,
+  /// saving the workout takes it down.
+  function wrapSession() {
+    if (sessionWrapped) return true;
+    if (typeof window.goTab !== 'function') return false;
+    sessionWrapped = true;
+
+    var originalGoTab = window.goTab;
+    window.goTab = function (tab) {
+      var result = originalGoTab.apply(this, arguments);
+      if (tab === 'log') startSession();
+      return result;
+    };
+
+    if (typeof window.saveWorkout === 'function') {
+      var originalSave = window.saveWorkout;
+      window.saveWorkout = function () {
+        var before = namedExerciseCount();
+        var result = originalSave.apply(this, arguments);
+        // A successful save empties the log and re-renders it with one blank
+        // card; a rejected one leaves what the user typed alone. That's the
+        // only signal saveWorkout gives us that the workout is in the books.
+        if (before && !namedExerciseCount()) endSession();
+        return result;
+      };
+    }
+
+    document.addEventListener('input', function (event) {
+      var target = event.target;
+      if (target && target.classList && target.classList.contains('ex-inp')) syncExercise();
+    }, true);
+
+    if (logPageOpen()) startSession();
+    return true;
+  }
+
   function injectChimeToggle() {
     var card = document.querySelector('.rest-card');
     if (!card || document.getElementById('lt-chime-row')) return;
@@ -282,14 +428,14 @@
 
     toggle.addEventListener('click', function () {
       if (chimeEnabled()) {
-        shim.removeItem(CHIME_KEY);
+        shim.setItem(CHIME_KEY, '0');
         paint();
         return;
       }
+      shim.setItem(CHIME_KEY, '1');
+      paint();
       requestChimePermission().then(function (granted) {
         if (granted) {
-          shim.setItem(CHIME_KEY, '1');
-          paint();
           if (typeof window.toast === 'function') window.toast('🔔 Chime on');
         } else if (typeof window.toast === 'function') {
           window.toast('Allow notifications in Settings to use the chime');
@@ -329,9 +475,12 @@
   function setUp() {
     applyShellStyles();
     injectChimeToggle();
-    if (!wrapRestTimer()) {
-      // Page script hasn't defined the timer yet — try again once it has.
-      window.addEventListener('load', wrapRestTimer, { once: true });
+    if (!wrapRestTimer() || !wrapSession()) {
+      // Page script hasn't defined its globals yet — try again once it has.
+      window.addEventListener('load', function () {
+        wrapRestTimer();
+        wrapSession();
+      }, { once: true });
     }
   }
 
