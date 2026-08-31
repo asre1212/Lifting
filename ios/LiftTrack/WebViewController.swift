@@ -8,6 +8,13 @@ final class WebViewController: UIViewController {
 
     private var webView: WKWebView!
 
+    /// The page's globals (`__ltRestSync` and friends) only exist once the
+    /// document has run, so native pushes are held until then.
+    private var isPageLoaded = false
+    /// A `lifttrack://log` open that arrived before the page was ready — which
+    /// is the normal case when the Live Activity cold-launches the app.
+    private var pendingShowLog = false
+
     // MARK: - Lifecycle
 
     override func loadView() {
@@ -21,17 +28,69 @@ final class WebViewController: UIViewController {
         buildWebView()
         loadApp()
 
-        RestTimerController.shared.clearOrphanedActivities()
-        NotificationCenter.default.addObserver(
+        let center = NotificationCenter.default
+        center.addObserver(
             self,
             selector: #selector(appDidBecomeActive),
             name: UIApplication.didBecomeActiveNotification,
+            object: nil
+        )
+        center.addObserver(
+            self,
+            selector: #selector(restDidChange),
+            name: RestTimerController.restChangedNotification,
+            object: nil
+        )
+        center.addObserver(
+            self,
+            selector: #selector(openLogRequested),
+            name: RestTimerController.openLogNotification,
             object: nil
         )
     }
 
     @objc private func appDidBecomeActive() {
         RestTimerController.shared.refreshOnForeground()
+        syncRestToPage()
+        flushPendingOpenLog()
+    }
+
+    /// A rest was started from the Lock Screen: the page's own counter has no
+    /// idea, so hand it the remaining time.
+    @objc private func restDidChange() {
+        syncRestToPage()
+    }
+
+    @objc private func openLogRequested() {
+        flushPendingOpenLog()
+    }
+
+    /// Called for the `lifttrack://log` deep link behind the Live Activity.
+    func showLogPage() {
+        guard isPageLoaded else {
+            pendingShowLog = true
+            return
+        }
+        run("window.__ltShowLog && window.__ltShowLog();")
+    }
+
+    private func flushPendingShowLog() {
+        guard pendingShowLog else { return }
+        pendingShowLog = false
+        showLogPage()
+    }
+
+    private func syncRestToPage() {
+        guard isPageLoaded else { return }
+        run("window.__ltRestSync && window.__ltRestSync(\(RestTimerController.shared.remainingSeconds));")
+    }
+
+    /// "Complete Workout" was tapped on the Lock Screen — possibly before the
+    /// page had even loaded, which is why the flag outlives the launch.
+    private func flushPendingOpenLog() {
+        guard isPageLoaded else { return }
+        guard RestTimerController.shared.consumePendingOpenLog() else { return }
+        run("window.__ltCompleteWorkout && window.__ltCompleteWorkout();")
     }
 
     override var preferredStatusBarStyle: UIStatusBarStyle { .lightContent }
@@ -119,6 +178,12 @@ final class WebViewController: UIViewController {
     }
 
     // MARK: - JS helpers
+
+    private func run(_ script: String) {
+        webView.evaluateJavaScript(script) { _, error in
+            if let error { NSLog("[LiftTrack] script failed: \(error.localizedDescription)") }
+        }
+    }
 
     private static func jsonObjectLiteral(_ dictionary: [String: String]) -> String {
         guard let raw = try? JSONSerialization.data(withJSONObject: dictionary),
@@ -256,24 +321,32 @@ extension WebViewController: WKScriptMessageHandler {
 
     private func handleRestTimer(_ body: Any) {
         guard let payload = body as? [String: Any], let op = payload["op"] as? String else { return }
+        let exercise = (payload["exercise"] as? String) ?? ""
 
         switch op {
         case "start":
             let seconds = (payload["seconds"] as? NSNumber)?.intValue ?? 0
-            let exercise = (payload["exercise"] as? String) ?? ""
-            let chime = (payload["chime"] as? Bool) ?? false
+            let chime = (payload["chime"] as? Bool) ?? true
             RestTimerController.shared.start(seconds: seconds, exercise: exercise, chime: chime)
 
         case "stop":
             RestTimerController.shared.stop()
 
+        // The user is on the Log page: put the session on the Lock Screen so
+        // the rest buttons are there without unlocking.
+        case "session":
+            RestTimerController.shared.beginSession(exercise: exercise)
+
+        case "exercise":
+            RestTimerController.shared.updateExercise(exercise)
+
+        // Workout saved in the app — the Lock Screen session is done with.
+        case "endSession":
+            RestTimerController.shared.endSession()
+
         case "requestChime":
             RestTimerController.shared.requestChimeAuthorization { [weak self] granted in
-                self?.webView.evaluateJavaScript("window.__ltChimeAuth(\(granted));") { _, error in
-                    if let error {
-                        NSLog("[LiftTrack] chime auth callback failed: \(error.localizedDescription)")
-                    }
-                }
+                self?.run("window.__ltChimeAuth && window.__ltChimeAuth(\(granted));")
             }
 
         default:
@@ -324,6 +397,13 @@ extension WebViewController: WKNavigationDelegate {
         if UIApplication.shared.canOpenURL(url) {
             UIApplication.shared.open(url)
         }
+    }
+
+    func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+        isPageLoaded = true
+        syncRestToPage()
+        flushPendingShowLog()
+        flushPendingOpenLog()
     }
 
     func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {

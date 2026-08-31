@@ -29,9 +29,10 @@ dependencies are WebKit, ActivityKit and WidgetKit, all part of iOS.
 | --- | --- |
 | `LiftTrack/WebViewController.swift` | Full-screen `WKWebView`, native message handlers, share sheet |
 | `LiftTrack/Storage.swift` | Durable key/value store backing the web app's data |
-| `LiftTrack/RestTimerController.swift` | Live Activity + background chime for the rest timer |
+| `LiftTrack/RestTimerController.swift` | Live Activity session + background chime for the rest timer |
 | `LiftTrack/Bridge.js` | Injected before page load; swaps in native-backed web APIs |
 | `Shared/RestActivityAttributes.swift` | Live Activity model, compiled into both targets |
+| `Shared/RestTimerIntents.swift` | App Intents behind the Lock Screen buttons, compiled into both targets |
 | `LiftTrackWidgets/` | Widget extension that draws the Dynamic Island / Lock Screen |
 | `Scripts/copy-web-assets.sh` | "Copy Web App" build phase — bundles the web app at `<App>.app/www` |
 
@@ -67,7 +68,7 @@ It now fires real haptics.
 Import is untouched: `<input type="file">` works natively and opens the document
 picker.
 
-## Rest timer: Dynamic Island and chime
+## Rest timer: Lock Screen session and chime
 
 The web app's rest timer is a `setInterval`, which iOS freezes the instant the
 app leaves the foreground — so a rest that ends while you're locked or in
@@ -76,15 +77,50 @@ bridge wraps the page's own `startRest`/`stopRest` (they're globals, because the
 rest chips call them from inline `onclick` handlers) and hands the rest length
 to native, which schedules both effects against the wall clock:
 
-- **Dynamic Island / Lock Screen** — a Live Activity started via ActivityKit.
-  The countdown is drawn with `Text(timerInterval:)`, so the *system* ticks the
-  digits down; the app never pushes an update and doesn't need to be running.
-  On phones without a Dynamic Island it appears on the Lock Screen instead. The
-  last exercise name you typed is used as the label.
+- **Lock Screen / Dynamic Island** — a Live Activity started via ActivityKit.
+  The countdown and its ring are drawn with `Text(timerInterval:)` and
+  `ProgressView(timerInterval:)`, so the *system* ticks them down; the app never
+  pushes an update and doesn't need to be running. The last exercise name you
+  typed is used as the label.
 - **Chime** — a local notification scheduled for the end of the rest, so it
-  fires with the app backgrounded or the phone locked. It's **off by default**,
-  behind a toggle injected into the rest card, and turning it on is what
+  fires with the app backgrounded or the phone locked. It's **on by default**,
+  with a toggle in the rest card to turn it off; opening the Log page is what
   triggers the iOS notification permission prompt.
+
+### The session, and the buttons on it
+
+The activity is scoped to a *workout*, not to one rest. Opening the Log page
+raises it; it then sits on the Lock Screen — idle between sets, counting down
+during a rest — until the workout ends. That's what makes the buttons worth
+having:
+
+- **1 / 2 / 3 MIN** — start (or restart) a countdown without unlocking. The
+  running length is filled in, so a glance tells you which rest you're on.
+- **Complete Workout** — takes the activity down and opens the app on the Log
+  page to write the sets down.
+
+Both are `LiveActivityIntent`s in `Shared/RestTimerIntents.swift`, compiled into
+both targets: the widget needs the types to build its buttons, the app runs the
+`perform()`. iOS runs a `LiveActivityIntent` in the *app's* process — launching
+it in the background if it isn't running — so the work itself lives behind a
+small handler registry that `RestTimerController` fills in at launch, and that
+stays empty (and unused) in the widget process.
+
+A rest started from the Lock Screen leaves the page's own counter behind, since
+its `setInterval` was frozen the whole time. `__ltRestSync` hands the page the
+remaining seconds when the app comes back up, and `__ltCompleteWorkout` is the
+Complete Workout button arriving on the JS side. The pending "open the Log page"
+flag outlives the launch in `UserDefaults`, because tapping that button can be
+what starts the app in the first place.
+
+Two details the Lock Screen depends on:
+
+- The activity's **stale date is the rest's end date**. That's what re-renders it
+  as "REST OVER" when the countdown runs out with the app suspended — there's
+  nothing running to push an update at that moment.
+- The app **re-adopts** an existing activity at launch instead of clearing it,
+  because tapping the activity is the usual way back into the app and the
+  workout it belongs to is still going.
 
 One wrinkle worth knowing about: when a rest ends while you're in another app,
 the notification chimes there, and then the page's own `restBeep()` would fire a
@@ -92,14 +128,19 @@ second time the moment you switch back. The bridge suppresses exactly that one
 duplicate — but only when the chime is on, since with it off the in-app beep is
 the only feedback there is.
 
-Live Activities need iOS 16.2+; the app itself still runs on iOS 15, and simply
-does without the island there. If you've switched Live Activities off for
-LiftTrack in Settings, the timer and chime still work.
+Live Activities need iOS 16.2+, and the buttons need iOS 17 (`Button(intent:)`
+in a widget). The app itself still runs on iOS 15: below 16.2 it does without
+the activity entirely, and on 16.2–16.x the activity appears with the countdown
+but no buttons. If you've switched Live Activities off for LiftTrack in
+Settings, the timer and chime still work.
 
 The chime uses a normal-priority notification, so Focus modes can hold it back.
 Making it break through requires Apple's Time Sensitive Notifications
 entitlement, which is deliberately not requested here — it would add a
 provisioning profile capability for a fairly small gain.
+
+`lifttrack://log` is registered as a URL scheme so tapping the activity itself
+lands on the Log page rather than wherever you last left the app.
 
 The service worker is deliberately **not** bundled. Service workers don't run
 for `file://` content in a `WKWebView`, and the native shell has no use for

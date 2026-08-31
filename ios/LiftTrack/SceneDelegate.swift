@@ -14,5 +14,18 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         window.overrideUserInterfaceStyle = .dark
         window.makeKeyAndVisible()
         self.window = window
+
+        handle(connectionOptions.urlContexts)
+    }
+
+    func scene(_ scene: UIScene, openURLContexts URLContexts: Set<UIOpenURLContext>) {
+        handle(URLContexts)
+    }
+
+    /// `lifttrack://log` — tapping the Live Activity drops the user straight on
+    /// the Log page rather than wherever they left the app.
+    private func handle(_ contexts: Set<UIOpenURLContext>) {
+        guard contexts.contains(where: { $0.url.scheme == "lifttrack" && $0.url.host == "log" }) else { return }
+        (window?.rootViewController as? WebViewController)?.showLogPage()
     }
 }
