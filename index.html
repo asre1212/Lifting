@@ -420,7 +420,7 @@
     .save-btn:active { transform: scale(.97); background: #2a2a2a; }
 
     /* ──────────────────────────────────────
-       QUICK LOG (prior exercises)
+       QUICK LOG (multi-select)
     ────────────────────────────────────── */
     .ql-wrap { margin: 0 0 10px; }
     .ql-toggle {
@@ -443,7 +443,7 @@
       max-height: 0; overflow: hidden; opacity: 0;
       transition: max-height .3s cubic-bezier(.4,0,.2,1), opacity .2s, margin-top .3s;
     }
-    .ql-panel.open { max-height: 620px; opacity: 1; margin-top: 8px; }
+    .ql-panel.open { max-height: 700px; opacity: 1; margin-top: 8px; }
     .ql-inner {
       background: var(--card); border: 1.5px solid var(--border);
       border-radius: 14px; padding: 11px 11px 10px;
@@ -474,7 +474,17 @@
     .ql-scope-btn.ghost { flex: 0 0 auto; padding: 8px 11px; color: var(--text); }
     .ql-scope-btn.ghost:active { border-color: var(--back); color: var(--back); }
 
-    .ql-list { margin-top: 9px; max-height: 306px; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+    .ql-bulk { display: flex; align-items: center; gap: 8px; margin-top: 10px; padding: 0 2px; }
+    .ql-bulk-count { flex: 1; font-size: 9px; font-weight: 800; color: var(--muted); letter-spacing: .5px; text-transform: uppercase; }
+    .ql-bulk-btn {
+      border: none; background: transparent; font-family: inherit;
+      font-size: 9px; font-weight: 800; letter-spacing: .5px; text-transform: uppercase;
+      color: var(--back); cursor: pointer; padding: 3px 2px;
+    }
+    .ql-bulk-btn:disabled { color: var(--muted); opacity: .45; cursor: default; }
+    .ql-bulk-btn:active { transform: scale(.96); }
+
+    .ql-list { margin-top: 6px; max-height: 306px; overflow-y: auto; -webkit-overflow-scrolling: touch; }
     .ql-item {
       display: flex; align-items: center; gap: 10px;
       padding: 9px 8px; border-radius: 10px; cursor: pointer;
@@ -493,6 +503,7 @@
       transition: all .15s;
     }
     .ql-item.on .ql-box { background: var(--back); border-color: var(--back); color: #fff; }
+    .ql-item.fresh .ql-box { border-style: dashed; }
     .ql-main { flex: 1; min-width: 0; }
     .ql-name {
       font-size: 13px; font-weight: 800; color: var(--text);
@@ -792,7 +803,7 @@
         </div>
         <div class="backup-info">
           <div class="backup-title">Check for Updates</div>
-          <div class="backup-sub">Reload latest version from server</div>
+          <div class="backup-sub" id="app-version">Reload latest version from server</div>
         </div>
         <button class="backup-btn import" onclick="reloadApp()" id="reload-btn">
           <i data-lucide="refresh-cw" width="13" height="13"></i>
@@ -862,12 +873,16 @@
         <div class="ql-inner">
           <div class="ql-search">
             <i data-lucide="search" width="14" height="14"></i>
-            <input id="ql-search" type="text" placeholder="Search prior exercises…" autocomplete="off" oninput="qlSearch(this.value)">
+            <input id="ql-search" type="text" placeholder="Search or type a new exercise…" autocomplete="off" oninput="qlSearch(this.value)">
           </div>
           <div class="ql-scope">
             <button class="ql-scope-btn" data-scope="sec" onclick="qlSetScope('sec')">This section</button>
             <button class="ql-scope-btn" data-scope="all" onclick="qlSetScope('all')">All sections</button>
             <button class="ql-scope-btn ghost" onclick="qlPickLast()">Last session</button>
+          </div>
+          <div class="ql-bulk">
+            <span class="ql-bulk-count" id="ql-count"></span>
+            <button class="ql-bulk-btn" id="ql-selall" onclick="qlSelectAll()">Select all</button>
           </div>
           <div class="ql-list" id="ql-list"></div>
           <div class="ql-foot">
@@ -1054,6 +1069,7 @@
   /* ──────────────────────────────────────
      CONSTANTS & DEFAULTS
   ────────────────────────────────────── */
+  const APP_VERSION = '6.0';
   const SECS = {
     arms:{label:'Arms',color:'#FF4F3B',icon:'zap'}, back:{label:'Back',color:'#5B4BFF',icon:'layers'},
     legs:{label:'Legs',color:'#00B894',icon:'move-vertical'}, core:{label:'Core',color:'#FF3D7B',icon:'target'},
@@ -1115,6 +1131,9 @@
   ────────────────────────────────────── */
   function boot() {
     generateIcon();
+
+    const ver = document.getElementById('app-version');
+    if (ver) ver.textContent = `v${APP_VERSION} — reload latest from server`;
 
     const h = new Date().getHours();
     document.getElementById('greet-text').textContent =
@@ -1230,10 +1249,11 @@
   function delCard(idx){if(rows[curSec].length<=1){rows[curSec][0]=blankRow();renderCards();return;}rows[curSec].splice(idx,1);renderCards();}
 
   /* ──────────────────────────────────────
-     LOG — quick log (prior exercises)
+     LOG — quick log (multi-select)
   ────────────────────────────────────── */
   let qlOpen = false, qlScope = 'sec', qlQuery = '';
   const qlSel = new Set();
+  const qlNew = new Map();  // brand-new names typed into the search box
   let _qlShown = [];
 
   // Latest logged entry per section+exercise, most recent first.
@@ -1253,6 +1273,38 @@
       });
     });
     return [...map.values()].sort((a,b)=>b.date.localeCompare(a.date)||a.name.localeCompare(b.name));
+  }
+  // A never-logged exercise — library entry or a name typed in the search box.
+  function qlFresh(name,sec){
+    return {key:sec+'|'+name.toLowerCase(), name, section:sec, date:'',
+            sets:4, reps:8, weight:'', weightMode:'total', duration:'',
+            subgroup:inferSubgroup(name,sec), fresh:true};
+  }
+  // Everything you can tick off: prior exercises (with their last numbers),
+  // then names you just typed, then the rest of the saved exercise library.
+  function qlCatalog(){
+    const prior=priorExercises(), seen=new Set(prior.map(i=>i.key)), custom=[];
+    qlNew.forEach(i=>{ if(!seen.has(i.key)){seen.add(i.key);custom.push(i);} });
+    const lib=getEx(), rest=[];
+    Object.keys(SECS).forEach(sec=>{
+      (lib[sec]||[]).forEach(n=>{
+        const name=(n||'').trim(); if(!name)return;
+        if(seen.has(sec+'|'+name.toLowerCase()))return;
+        seen.add(sec+'|'+name.toLowerCase());
+        rest.push(qlFresh(name,sec));
+      });
+    });
+    rest.sort((a,b)=>a.name.localeCompare(b.name));
+    // Unsaved cards already on the log — listed (greyed out) so a name you
+    // just typed in can't be picked twice.
+    const staged=[];
+    Object.keys(rows).forEach(sec=>rows[sec].forEach(r=>{
+      const name=(r.exercise||'').trim(); if(!name)return;
+      if(seen.has(sec+'|'+name.toLowerCase()))return;
+      seen.add(sec+'|'+name.toLowerCase());
+      staged.push(qlFresh(name,sec));
+    }));
+    return [...custom,...prior,...rest,...staged];
   }
   function qlAgo(ds){
     const d=new Date(ds+'T00:00:00'), now=new Date();
@@ -1275,10 +1327,27 @@
   function closeQuickLog(){ if(qlOpen)toggleQuickLog(); }
   function qlSearch(v){ qlQuery=v; renderQuickLog(); }
   function qlSetScope(scope){ qlScope=scope; renderQuickLog(); }
-  function qlClear(){ qlSel.clear(); renderQuickLog(); }
+  function qlClear(){ qlSel.clear(); qlNew.clear(); renderQuickLog(); }
+  function qlResetSearch(){
+    qlQuery='';
+    const s=document.getElementById('ql-search'); if(s)s.value='';
+  }
   function qlTog(i){
     const item=_qlShown[i]; if(!item||qlInLog(item))return;
-    if(qlSel.has(item.key))qlSel.delete(item.key);else qlSel.add(item.key);
+    if(qlSel.has(item.key)){ qlSel.delete(item.key); qlNew.delete(item.key); }
+    else {
+      if(item.create){ qlNew.set(item.key,qlFresh(item.name,item.section)); qlResetSearch(); }
+      qlSel.add(item.key);
+    }
+    renderQuickLog();
+  }
+  // Tick (or untick) everything currently listed — the fast path for
+  // repeating a whole section in one go.
+  function qlSelectAll(){
+    const pick=_qlShown.filter(i=>!i.create&&!qlInLog(i));
+    if(!pick.length)return;
+    if(pick.every(i=>qlSel.has(i.key))) pick.forEach(i=>{qlSel.delete(i.key);qlNew.delete(i.key);});
+    else pick.forEach(i=>qlSel.add(i.key));
     renderQuickLog();
   }
   function qlPickLast(){
@@ -1292,18 +1361,17 @@
     }));
     let n=0;
     priorExercises().forEach(i=>{ if(keys.has(i.key)&&!qlInLog(i)){qlSel.add(i.key);n++;} });
-    qlScope='all'; qlQuery='';
-    const s=document.getElementById('ql-search'); if(s)s.value='';
+    qlScope='all'; qlResetSearch();
     renderQuickLog();
     toast(n?`${n} from ${qlAgo(lastDate).toLowerCase()} selected`:'Already in your log');
   }
   function updateQuickLogHead(){
     const sub=document.getElementById('ql-toggle-sub'),badge=document.getElementById('ql-badge');
     if(!sub||!badge)return;
-    const all=priorExercises(), n=qlSel.size;
-    sub.textContent=!all.length?'No history yet'
+    const all=qlCatalog(), n=qlSel.size;
+    sub.textContent=!all.length?'No exercises yet'
       :n?`${n} ready to add`
-      :`Check off from ${all.length} prior exercise${all.length>1?'s':''}`;
+      :`Tick off any of ${all.length} exercises`;
     badge.style.display=n?'':'none';
     badge.textContent=n;
   }
@@ -1311,46 +1379,61 @@
     updateQuickLogHead();
     if(!qlOpen)return;
     document.querySelectorAll('.ql-scope-btn[data-scope]').forEach(b=>b.classList.toggle('on',b.dataset.scope===qlScope));
-    const q=qlQuery.trim().toLowerCase();
-    _qlShown=priorExercises()
+    const q=qlQuery.trim(), ql=q.toLowerCase();
+    const all=qlCatalog();
+    _qlShown=all
       .filter(i=>qlScope==='all'||i.section===curSec)
-      .filter(i=>!q||i.name.toLowerCase().includes(q));
+      .filter(i=>!ql||i.name.toLowerCase().includes(ql));
+    // Typed something that isn't on the list yet? Offer it as a new exercise.
+    if(q && !all.some(i=>i.name.toLowerCase()===ql && (qlScope==='all'||i.section===curSec)))
+      _qlShown=[{...qlFresh(q,curSec),create:true},..._qlShown];
+
     const list=document.getElementById('ql-list');
     if(!_qlShown.length){
-      list.innerHTML=`<div class="ql-empty">${priorExercises().length
+      list.innerHTML=`<div class="ql-empty">${all.length
         ?'No matches — try “All sections”.'
-        :'No prior exercises yet — save a workout first.'}</div>`;
+        :'No exercises yet — type a name above to add one.'}</div>`;
     }else{
       list.innerHTML=_qlShown.map((i,idx)=>{
         const on=qlSel.has(i.key), inLog=qlInLog(i), color=SECS[i.section].color;
         const hasSR=i.sets!==''&&i.sets!==null&&i.reps!==''&&i.reps!==null;
         const dur=i.duration!==''&&i.duration!==null?`${i.duration} min`:'';
-        const sr=[hasSR?`${i.sets} sets × ${i.reps} reps`:'',dur].filter(Boolean).join(' · ')||'No sets logged';
-        return `<label class="ql-item${on?' on':''}${inLog?' in':''}">
+        const sr=i.create?`Add “${esc(i.name)}” as a new ${SECS[i.section].label} exercise`
+          :i.date?([hasSR?`${i.sets} sets × ${i.reps} reps`:'',dur].filter(Boolean).join(' · ')||'No sets logged')
+          :'Never logged · starts at 4 × 8';
+        return `<label class="ql-item${on?' on':''}${inLog?' in':''}${i.date?'':' fresh'}">
           <input type="checkbox" ${on?'checked':''} ${inLog?'disabled':''} onchange="qlTog(${idx})">
-          <span class="ql-box">✓</span>
+          <span class="ql-box">${i.create?'+':'✓'}</span>
           <span class="ql-main">
-            <span class="ql-name">${qlScope==='all'?`<span class="ql-dot" style="background:${color}"></span>`:''}${esc(i.name)}</span>
+            <span class="ql-name">${qlScope==='all'||i.create?`<span class="ql-dot" style="background:${color}"></span>`:''}${esc(i.name)}</span>
             <span class="ql-sub">${sr}${inLog?' · <span class="ql-tag">In log</span>':''}</span>
           </span>
           <span class="ql-right">
-            <div class="ql-wt" style="color:${color}">${weightLabel(i)}</div>
-            <div class="ql-when">${qlAgo(i.date)}</div>
+            <div class="ql-wt" style="color:${i.date?color:'var(--muted)'}">${i.date?weightLabel(i):'—'}</div>
+            <div class="ql-when">${i.date?qlAgo(i.date):(i.create?'New':'Unlogged')}</div>
           </span>
         </label>`;
       }).join('');
     }
+
+    const pick=_qlShown.filter(i=>!i.create&&!qlInLog(i));
+    const allOn=pick.length&&pick.every(i=>qlSel.has(i.key));
+    const cnt=document.getElementById('ql-count'),sa=document.getElementById('ql-selall');
+    if(cnt)cnt.textContent=`${_qlShown.length} shown${qlSel.size?` · ${qlSel.size} picked`:''}`;
+    if(sa){sa.disabled=!pick.length;sa.textContent=allOn?'Deselect all':'Select all';}
+
     const btn=document.getElementById('ql-add'),lbl=document.getElementById('ql-add-lbl');
     const n=qlSel.size;
     btn.disabled=!n;
     lbl.textContent=n?`Add ${n} exercise${n>1?'s':''}`:'Add to log';
   }
-  // Turn the checked prior exercises into normal log cards, prefilled with
-  // the weights/sets/reps from the last time each was logged.
+  // Turn every checked exercise into a log card in one pass — prior ones
+  // prefilled with the weights/sets/reps from the last time they were logged.
   function qlAddSelected(){
-    const chosen=priorExercises().filter(i=>qlSel.has(i.key));
+    const chosen=qlCatalog().filter(i=>qlSel.has(i.key));
     if(!chosen.length)return;
     let added=0,skipped=0,jumpSec=null;
+    const secs=new Set();
     chosen.forEach(i=>{
       if(qlInLog(i)){skipped++;return;}
       const list=rows[i.section];
@@ -1358,14 +1441,15 @@
                  weight:i.weight,weightMode:i.weightMode,duration:i.duration};
       if(list.length===1&&!(list[0].exercise||'').trim()&&list[0].weight==='')list[0]=row;
       else list.push(row);
-      added++;
+      added++; secs.add(i.section);
       if(i.section===curSec)jumpSec=curSec;
       else if(!jumpSec)jumpSec=i.section;
     });
-    qlSel.clear();
+    qlSel.clear(); qlNew.clear(); qlResetSearch();
     closeQuickLog();
     setSec(jumpSec||curSec);
-    if(added)toast(`✓ ${added} added with prior weights${skipped?` · ${skipped} already in log`:''}`);
+    const where=secs.size>1?` across ${secs.size} sections`:'';
+    if(added)toast(`✓ ${added} added${where}${skipped?` · ${skipped} already in log`:''}`);
     else toast('Already in your log');
   }
 

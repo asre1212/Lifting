@@ -5,7 +5,7 @@
      • Everything else                           → network-first, fall to cache
    ───────────────────────────────────────────────────────────────────────── */
 
-const VERSION     = 'lifttrack-v5-selfhosted';
+const VERSION     = 'lifttrack-v6-multiselect';
 const CACHE_SHELL = VERSION + '-shell';
 const CACHE_CDN   = VERSION + '-cdn';
 
