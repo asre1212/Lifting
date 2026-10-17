@@ -1,8 +1,9 @@
 # Local voice workout entries
 
-Open the Safari / Home Screen web app, go to Log, and expand **Voice entry · on device**.
-Use **Download / load model** on Wi-Fi first. Tap **Record**, speak for up to 30 seconds,
-then **Stop**. The transcript is parsed automatically. Review the editable preview,
+Open the Safari / Home Screen web app and go to Log. Tap the **microphone** to start
+recording; it turns red. Tap the same microphone again to stop (maximum 30 seconds).
+The entry panel opens below it. First use downloads the speech model; use Wi-Fi for
+that initial download. The microphone is disabled while the audio is being processed. The transcript is parsed automatically. Review the editable preview,
 then choose **Add to workout**. For a typed or edited transcript, use **Preview entries**.
 Edit the resulting workout cards and use the existing **Save workout** button.
 
@@ -68,7 +69,8 @@ References:
 Serve the repository on localhost:8765, install Playwright in your test environment,
 then run `node tests/voice-ui.test.cjs`. Set `CHROMIUM_PATH` if using an existing
 Chromium binary. This checks automatic transcription preview, the RDL regression,
-category/subgroup/field mapping, manual corrections, preserved drafts, saved volume,
+category/subgroup/field mapping, microphone start/stop and processing states,
+manual corrections, preserved drafts, saved volume,
 duplicate-add prevention, stale-preview invalidation, and text injection safety.
 
 Physical iPhone Air microphone, speed, battery, and offline-cache behavior still

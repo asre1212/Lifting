@@ -1,6 +1,6 @@
 const {chromium}=require('playwright');const assert=require('node:assert/strict');
 (async()=>{const browser=await chromium.launch({headless:true,executablePath:process.env.CHROMIUM_PATH});const context=await browser.newContext({viewport:{width:390,height:844}});const page=await context.newPage();const errors=[];page.on('pageerror',e=>errors.push(e.message));
-await page.goto('http://localhost:8765');await page.waitForTimeout(1000);await page.evaluate(()=>goTab('log'));await page.locator('.voice-card summary').click();
+await page.goto('http://localhost:8765');await page.waitForTimeout(1000);await page.evaluate(()=>goTab('log'));assert.equal(await page.locator('#voice-panel').isHidden(),true);assert.equal(await page.locator('#voice-record').textContent(),'');assert.equal(await page.locator('#voice-record svg').count(),1);await page.screenshot({path:'/tmp/lifting-mic-idle.png',fullPage:true});await page.evaluate(()=>{document.getElementById('voice-panel').hidden=false;});
 await page.locator('#voice-text').fill('Bench press, three sets of eight at 135 pounds. Dumbbell curls, 3 sets of 10 at 22.5 pounds each.');await page.locator('#voice-parse').click();assert.equal(await page.locator('.voice-preview-row').count(),2);
 await page.locator('#voice-add').click();assert.equal(await page.locator('#voice-add').isHidden(),true);assert.equal(await page.locator('#voice-text').inputValue(),'');
 const staged=await page.evaluate(()=>Object.values(rows).flat().filter(r=>r.exercise));assert.equal(staged.length,2);assert.equal(staged.find(r=>r.weightMode==='each').weight,22.5);assert.equal(staged.find(r=>r.weightMode==='each').weightMode,'each');
@@ -39,18 +39,25 @@ await page.evaluate(()=>{for(const sec of Object.keys(rows))rows[sec]=[];});
 await page.evaluate(()=>goTab('log'));await page.locator('#voice-text').fill('<img src=x onerror=alert(1)>, 3 sets of 8 at 10 pounds');await page.locator('#voice-parse').click();assert.equal(await page.locator('#voice-preview img').count(),0);
 await page.locator('#voice-text').fill('Bench press, 3 sets of 8 at 135 pounds');assert.equal(await page.locator('#voice-add').isHidden(),true);await page.locator('#voice-parse').click();await page.locator('#voice-add').click();assert.equal(await page.evaluate(()=>Object.values(rows).flat().filter(r=>r.exercise).length),1);
 await page.evaluate(()=>{window.stoppedTracks=0;Object.defineProperty(navigator.mediaDevices,'getUserMedia',{configurable:true,writable:true,value:async()=>({getTracks:()=>[{stop(){window.stoppedTracks++}}]})});window.MediaRecorder=class{constructor(){this.state='inactive';this.mimeType='audio/webm'}start(){this.state='recording'}stop(){this.state='inactive';this.onstop()}};});
-await page.locator('#voice-record').click();assert.equal(await page.locator('#voice-stop').isVisible(),true);await page.locator('#voice-cancel').click();assert.equal(await page.locator('#voice-stop').isHidden(),true);assert.equal(await page.evaluate(()=>stoppedTracks),1);assert.equal(await page.locator('#voice-record').isEnabled(),true);
+await page.locator('#voice-record').click();assert.equal(await page.locator('#voice-record').getAttribute('aria-pressed'),'true');assert.equal(await page.locator('#voice-record').getAttribute('aria-label'),'Stop voice recording');assert.equal(await page.locator('#voice-record').isEnabled(),true);await page.locator('#voice-cancel').click();assert.equal(await page.locator('#voice-record').getAttribute('aria-pressed'),'false');assert.equal(await page.locator('#voice-panel').isHidden(),true);assert.equal(await page.evaluate(()=>stoppedTracks),1);assert.equal(await page.locator('#voice-record').isEnabled(),true);
 await page.evaluate(()=>{navigator.mediaDevices.getUserMedia=async()=>{throw new DOMException('denied','NotAllowedError')}});await page.locator('#voice-record').click();assert.match(await page.locator('#voice-status').textContent(),/permission denied/);assert.equal(await page.locator('#voice-record').isEnabled(),true);
 // A completed on-device transcription automatically previews the corrected fields.
 await page.locator('#voice-text').fill('');
 await page.evaluate(()=>{
  navigator.mediaDevices.getUserMedia=async()=>({getTracks:()=>[{stop(){}}]});
- window.Worker=class{postMessage({id}){queueMicrotask(()=>this.onmessage({data:{id,text:'RDL4 sets of 10 at 20 pounds each side.'}}))}terminate(){}};
+ window.Worker=class{postMessage({id}){window.finishTranscription=()=>this.onmessage({data:{id,text:'RDL4 sets of 10 at 20 pounds each side.'}})}terminate(){}};
  window.AudioContext=class{async decodeAudioData(){return {duration:1}}async close(){}};
  window.OfflineAudioContext=class{createBufferSource(){return {connect(){},start(){}}}async startRendering(){return {getChannelData:()=>new Float32Array(16000).fill(.1)}}};
 });
-await page.locator('#voice-record').click();await page.locator('#voice-stop').click();
+await page.locator('#voice-record').click();
+assert.equal(await page.locator('#voice-panel').isVisible(),true);assert.equal(await page.locator('#voice-record').getAttribute('aria-expanded'),'true');
+await page.screenshot({path:'/tmp/lifting-mic-recording.png',fullPage:true});
+await page.getByRole('button',{name:'Stop voice recording'}).click();
+await page.waitForFunction(()=>typeof window.finishTranscription==='function');
+assert.equal(await page.locator('#voice-record').isDisabled(),true);assert.equal(await page.locator('#voice-record').getAttribute('aria-pressed'),'false');
+await page.evaluate(()=>window.finishTranscription());
 await page.locator('#voice-entry-0-exercise').waitFor();
 assert.equal(await page.locator('#voice-entry-0-exercise').inputValue(),'Romanian Deadlift');assert.equal(await page.locator('#voice-entry-0-sets').inputValue(),'4');assert.equal(await page.locator('#voice-entry-0-section').inputValue(),'legs');
-await page.screenshot({path:'/tmp/lifting-voice.png',fullPage:true});assert.deepEqual(errors,[]);console.log('UI: RDL regression, category/subgroup/field mapping, edits, saved volume, preserved drafts, XSS, stale preview, cancellation and microphone denial passed');
+assert.equal(await page.locator('#voice-record').getAttribute('aria-label'),'Start voice recording');assert.equal(await page.locator('#voice-record').isEnabled(),true);
+await page.screenshot({path:'/tmp/lifting-voice.png',fullPage:true});assert.deepEqual(errors,[]);console.log('UI: microphone start/stop and processing states, RDL regression, category/subgroup/field mapping, edits, saved volume, preserved drafts, XSS, stale preview, cancellation and microphone denial passed');
 await browser.close();})();

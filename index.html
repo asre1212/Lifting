@@ -723,7 +723,7 @@
   </style>
 <style>
 .voice-card{padding:16px;margin:16px 0;border:1.5px solid var(--border);border-radius:14px;background:var(--bg)}
-.voice-card summary{cursor:pointer;font-weight:800;font-size:14px}.voice-card p{font-size:12px;line-height:1.6;margin:10px 0;color:var(--muted)}
+.voice-mic{display:flex;align-items:center;justify-content:center;width:48px;height:48px;margin:16px 0;border:1.5px solid var(--border);border-radius:50%;background:var(--bg);color:var(--back);cursor:pointer}.voice-mic svg{width:22px;height:22px;pointer-events:none}.voice-mic[aria-pressed="true"]{background:#c52f25;border-color:#c52f25;color:#fff;box-shadow:0 0 0 4px #c52f2520}.voice-mic:disabled{opacity:.55;cursor:wait}.voice-mic:focus-visible{outline:3px solid var(--back);outline-offset:3px}.voice-card p{font-size:12px;line-height:1.6;margin:10px 0;color:var(--muted)}
 .voice-card label{display:block;font-size:12px;margin:12px 0 6px}.voice-card textarea{box-sizing:border-box;width:100%;padding:12px;font:inherit;font-size:16px;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:8px}
 .voice-actions{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0}.voice-actions button{padding:10px 12px;min-height:44px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);font:inherit;font-size:12px;cursor:pointer}.voice-actions button:disabled{opacity:.5}.voice-preview-row{padding:10px 0;border-top:1px solid var(--border)}.voice-preview-row strong{font-size:14px}
 .voice-fields{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px 10px}.voice-fields .voice-wide{grid-column:1/-1}.voice-fields label{min-width:0;margin:8px 0 0}.voice-fields input,.voice-fields select{display:block;box-sizing:border-box;width:100%;min-height:44px;margin-top:6px;padding:8px;font:inherit;font-size:16px;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:8px}
@@ -905,16 +905,16 @@
       </div>
     </div>
 
-    <details class="voice-card">
-      <summary>Voice entry · on device</summary>
+    <button type="button" id="voice-record" class="voice-mic" aria-label="Start voice recording" title="Start voice recording" aria-pressed="false" aria-controls="voice-panel" aria-expanded="false"><i data-lucide="mic" aria-hidden="true"></i></button>
+    <div id="voice-panel" class="voice-card" hidden>
       <p>Record a short workout description. Audio and text stay on this device. First setup downloads speech files from Hugging Face and jsDelivr.</p>
-      <div class="voice-actions"><button type="button" id="voice-load">Download / load model</button><button type="button" id="voice-record">Record</button><button type="button" id="voice-stop" hidden>Stop</button><button type="button" id="voice-cancel">Cancel</button></div>
+      <div class="voice-actions"><button type="button" id="voice-load">Download / load model</button><button type="button" id="voice-cancel">Close</button></div>
       <p id="voice-status" role="status" aria-live="polite">Say: Bench press, three sets of eight at 135 pounds. Exercises are sorted into categories automatically. Use a new sentence for each exercise.</p>
       <label for="voice-text">Transcript — review or type an entry</label>
       <textarea id="voice-text" rows="4" placeholder="Bench press, 3 sets of 8 at 135 pounds." autocomplete="off" autocorrect="off" spellcheck="false"></textarea>
       <div class="voice-actions"><button type="button" id="voice-parse">Preview entries</button><button type="button" id="voice-add" hidden>Add to workout</button></div>
       <div id="voice-preview"></div>
-    </details>
+    </div>
     <div id="ex-cards"></div>
 
     <button class="add-btn" onclick="addCard()">
@@ -1088,7 +1088,7 @@
   /* ──────────────────────────────────────
      CONSTANTS & DEFAULTS
   ────────────────────────────────────── */
-  const APP_VERSION = '7.2';
+  const APP_VERSION = '7.3';
   const SECS = {
     arms:{label:'Arms',color:'#FF4F3B',icon:'zap'}, back:{label:'Back',color:'#5B4BFF',icon:'layers'},
     legs:{label:'Legs',color:'#00B894',icon:'move-vertical'}, core:{label:'Core',color:'#FF3D7B',icon:'target'},

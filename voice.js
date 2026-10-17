@@ -15,9 +15,18 @@ function call(op,audio){
  return new Promise((resolve,reject)=>{const id=++seq;pending={id,resolve,reject,timeout:setTimeout(()=>abortWorker('Speech engine timed out. Retry or type the entry.'),240000)};worker.postMessage({id,op,audio},audio?[audio.buffer]:[]);});
 }
 function abortWorker(message){if(worker)worker.terminate();worker=null;if(pending){clearTimeout(pending.timeout);pending.reject(new Error(message));pending=null;}}
-function controls(on){$('voice-load').disabled=on;$('voice-record').disabled=on;$('voice-parse').disabled=on;$('voice-text').disabled=on;}
-async function loadModel(){if(location.protocol==='file:'){status('Open the Safari or Home Screen web app to download and run local Whisper.');return;}controls(true);status('Downloading speech files; first setup needs internet.');try{await call('load');status('Speech model ready on this device.');}catch(e){status(e.message);}finally{controls(false);}}
-function release(){clearTimeout(timer);if(stream)stream.getTracks().forEach(t=>t.stop());stream=null;$('voice-stop').hidden=true;}
+function micState(state){
+ const button=$('voice-record'),recording=state==='recording';
+ const label=recording?'Stop voice recording':state==='busy'?'Processing voice entry':'Start voice recording';
+ button.disabled=state==='busy';button.setAttribute('aria-pressed',String(recording));button.setAttribute('aria-label',label);button.title=label;
+}
+function controls(on){$('voice-load').disabled=on;$('voice-parse').disabled=on;$('voice-text').disabled=on;$('voice-add').disabled=on;micState(on?'busy':'idle');}
+async function loadModel(){if(location.protocol==='file:'){status('Open the Safari or Home Screen web app to download and run local Whisper.');return;}const gen=generation;controls(true);status('Downloading speech files; first setup needs internet.');try{await call('load');if(gen===generation)status('Speech model ready on this device.');}catch(e){if(gen===generation)status(e.message);}finally{if(gen===generation)controls(false);}}
+function release(){clearTimeout(timer);if(stream)stream.getTracks().forEach(t=>t.stop());stream=null;}
+function toggleRecording(){
+ $('voice-panel').hidden=false;$('voice-record').setAttribute('aria-expanded','true');
+ if(recorder?.state==='recording')stop();else start();
+}
 async function start(){
  if(location.protocol==='file:'){status('Local Whisper recording requires the Safari or Home Screen web app. You can type entries in this native wrapper.');return;}
  if(!navigator.mediaDevices?.getUserMedia||!window.MediaRecorder){status('Microphone unavailable here. Type your entry below.');return;}
@@ -26,30 +35,33 @@ async function start(){
   const acquired=await navigator.mediaDevices.getUserMedia({audio:{channelCount:1,echoCancellation:true,noiseSuppression:true}});
   if(gen!==generation){acquired.getTracks().forEach(t=>t.stop());return;}
   stream=acquired;
-  chunks=[];recorder=new MediaRecorder(stream);
-  recorder.ondataavailable=e=>{if(e.data.size)chunks.push(e.data);};
-  recorder.onstop=()=>{release();if(canceled){chunks=[];controls(false);return;}transcribe();};
-  recorder.onerror=()=>{canceled=true;release();controls(false);status('Recording failed. Please retry.');};
-  recorder.start();$('voice-stop').hidden=false;status('Recording locally… tap Stop. Maximum 30 seconds.');timer=setTimeout(stop,30000);
- }catch(e){release();controls(false);status(e.name==='NotAllowedError'?'Microphone permission denied. Allow it in Settings, or type the entry.':e.message);}
+  chunks=[];const activeRecorder=new MediaRecorder(stream);recorder=activeRecorder;
+  recorder.ondataavailable=e=>{if(gen===generation&&e.data.size)chunks.push(e.data);};
+  recorder.onstop=()=>{if(gen!==generation)return;release();if(canceled){chunks=[];controls(false);return;}transcribe(activeRecorder.mimeType,gen);};
+  recorder.onerror=()=>{if(gen!==generation)return;canceled=true;release();controls(false);status('Recording failed. Please retry.');};
+  recorder.start();micState('recording');status('Recording locally… tap the microphone again to stop. Maximum 30 seconds.');timer=setTimeout(stop,30000);
+ }catch(e){if(gen!==generation)return;release();controls(false);status(e.name==='NotAllowedError'?'Microphone permission denied. Allow it in Settings, or type the entry.':e.message);}
 }
-function stop(){if(recorder?.state==='recording')recorder.stop();}
-async function transcribe(){
+function stop(){if(recorder?.state==='recording'){micState('busy');recorder.stop();}}
+async function transcribe(mimeType,gen){
  let ctx;
  try{
   status('Transcribing on your device…');
-  const blob=new Blob(chunks,{type:recorder.mimeType});chunks=[];
+  const blob=new Blob(chunks,{type:mimeType});chunks=[];
   ctx=new (window.AudioContext||window.webkitAudioContext)();
   const decoded=await ctx.decodeAudioData(await blob.arrayBuffer());
+  if(gen!==generation)return;
   const offline=new OfflineAudioContext(1,Math.ceil(decoded.duration*16000),16000);
   const source=offline.createBufferSource();source.buffer=decoded;source.connect(offline.destination);source.start();
   const pcm=(await offline.startRendering()).getChannelData(0);
+  if(gen!==generation)return;
   let energy=0;for(const x of pcm)energy+=x*x;
   if(Math.sqrt(energy/pcm.length)<0.002)throw new Error('No clear speech detected. Try again closer to the microphone.');
   const r=await call('transcribe',pcm);
+  if(gen!==generation)return;
   $('voice-text').value=[$('voice-text').value,r.text.trim()].filter(Boolean).join('\n');
   parse();
- }catch(e){status(e.message);}finally{if(ctx)await ctx.close();controls(false);}
+ }catch(e){if(gen===generation)status(e.message);}finally{if(ctx)await ctx.close();if(gen===generation)controls(false);}
 }
 function parse(){
  const normalized=LiftVoiceParser.normalizeTranscript($('voice-text').value);
@@ -113,9 +125,9 @@ function add(){
  preview=[];$('voice-preview').replaceChildren();$('voice-add').hidden=true;$('voice-text').value='';setSec(first);
  status(`Added ${destinations}. Check the workout cards, then Save workout.`);toast('Voice entries added — review before saving');
 }
-function cancel(){generation++;canceled=true;stop();release();abortWorker('Canceled.');controls(false);status('Canceled. Audio discarded.');}
+function cancel(){generation++;canceled=true;stop();release();chunks=[];abortWorker('Canceled.');controls(false);status('Canceled. Audio discarded.');}
 function init(){
- $('voice-load').onclick=loadModel;$('voice-record').onclick=start;$('voice-stop').onclick=stop;$('voice-cancel').onclick=cancel;$('voice-parse').onclick=parse;$('voice-add').onclick=add;
+ $('voice-load').onclick=loadModel;$('voice-record').onclick=toggleRecording;$('voice-cancel').onclick=()=>{cancel();$('voice-panel').hidden=true;$('voice-record').setAttribute('aria-expanded','false');$('voice-record').focus();};$('voice-parse').onclick=parse;$('voice-add').onclick=add;
  $('voice-text').oninput=()=>{preview=[];$('voice-preview').replaceChildren();$('voice-add').hidden=true;};
  document.addEventListener('visibilitychange',()=>{if(document.hidden&&(stream||recorder?.state==='recording'))cancel();});
  window.addEventListener('pagehide',cancel);
