@@ -21,7 +21,7 @@ mkdir -p "${DEST}"
 # Top-level files. service-worker.js is deliberately excluded: service workers
 # don't run for file:// content in a WKWebView, and the native shell has no use
 # for the offline cache or the in-app update prompt it drives.
-for FILE in index.html manifest.json icon-192.png icon-512.png apple-touch-icon.png; do
+for FILE in index.html voice.js voice-parser.js voice-worker.js manifest.json icon-192.png icon-512.png apple-touch-icon.png; do
   if [ -f "${REPO_ROOT}/${FILE}" ]; then
     rsync -a "${REPO_ROOT}/${FILE}" "${DEST}/${FILE}"
   else
@@ -39,3 +39,4 @@ for DIR in vendor fonts; do
 done
 
 echo "Copied web app to ${DEST}"
+

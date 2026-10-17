@@ -5,7 +5,7 @@
      • Everything else                           → network-first, fall to cache
    ───────────────────────────────────────────────────────────────────────── */
 
-const VERSION     = 'lifttrack-v6-multiselect';
+const VERSION     = 'lifttrack-v7-local-voice';
 const CACHE_SHELL = VERSION + '-shell';
 const CACHE_CDN   = VERSION + '-cdn';
 
@@ -13,6 +13,10 @@ const CACHE_CDN   = VERSION + '-cdn';
 const SHELL_ASSETS = [
   './',
   './index.html',
+  './voice-parser.js',
+  './voice.js',
+  './voice-worker.js',
+  './vendor/transformers.min.js',
   './manifest.json',
   './icon-192.png',
   './icon-512.png',
@@ -59,6 +63,9 @@ self.addEventListener('fetch', event => {
   // Only handle GET requests
   if (request.method !== 'GET') return;
 
+  // The speech library owns its persistent model cache; avoid duplicate large copies.
+  if (url.hostname === 'huggingface.co') return;
+
   // Skip non-http(s) requests (e.g. chrome-extension://)
   if (!url.protocol.startsWith('http')) return;
 
@@ -67,7 +74,7 @@ self.addEventListener('fetch', event => {
 
 async function handleFetch(request) {
   const url = new URL(request.url);
-  const isShell = SHELL_ASSETS.some(a => request.url.endsWith(a.replace('./', '')));
+  const isShell = url.origin === self.location.origin && SHELL_ASSETS.some(a => url.href === new URL(a, self.registration.scope).href);
 
   if (isShell) {
     // Cache-first for app shell; update in background
@@ -85,7 +92,7 @@ async function handleFetch(request) {
     const response = await fetch(request);
     if (response && response.status === 200) {
       const cache = await caches.open(CACHE_CDN);
-      cache.put(request, response.clone());
+      await cache.put(request, response.clone()).catch(() => {});
     }
     return response;
   } catch (_) {
@@ -102,7 +109,7 @@ async function fetchAndCache(cacheName, request) {
   const response = await fetch(request);
   if (response && response.status === 200) {
     const cache = await caches.open(cacheName);
-    cache.put(request, response.clone());
+    await cache.put(request, response.clone()).catch(() => {});
   }
   return response;
 }
@@ -123,3 +130,4 @@ self.addEventListener('message', event => {
     self.skipWaiting();
   }
 });
+

@@ -1,0 +1,12 @@
+const assert=require('node:assert/strict');require('../voice-parser.js');
+const parse=t=>LiftVoiceParser.parse(t,[{name:'Bench press',section:'chest'},{name:'Dumbbell curls',section:'arms'},{name:'Plank',section:'core'}],'general');
+let p=parse('Bench press, three sets of eight at one hundred thirty five pounds. Dumbbell curls, three sets of ten at twenty five pounds each.');
+assert.equal(p.length,2);assert.equal(p[0].weight,135);assert.equal(p[0].sets,3);assert.equal(p[0].reps,8);assert.equal(p[0].section,'chest');assert.equal(p[1].weightMode,'each');assert.equal(p[1].weight,25);
+p=parse('Dumbbell curls, 3 x 10 at 22.5 pounds each.');assert.equal(p.length,1);assert.equal(p[0].weight,22.5);
+p=parse('Bench press, 3 sets of 8 at 60 kilograms');assert.equal(p[0].weight,132.28);
+p=parse('Plank for 90 seconds bodyweight');assert.equal(p[0].duration,1.5);assert.equal(p[0].weight,0);
+p=parse('Bench press');assert.equal(p[0].sets,'');assert.ok(p[0].issues.length);
+assert.equal(parse('').length,0);
+p=parse('New exercise, 2 sets of 12 at 40 pounds');assert.equal(p[0].section,'general');assert.ok(p[0].issues.includes('Check exercise and category'));
+p=parse('Bench press, 2 sets of 8 at 135 pounds; Bench press, 1 set of 6 at 145 pounds');assert.equal(p.length,2);assert.equal(p[1].sets,1);
+console.log('8 parser scenarios passed');
