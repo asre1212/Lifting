@@ -16,6 +16,8 @@ For example, “RDLs for sets of 10 at 20 pounds each side” becomes **Romanian
 Legs → Glutes / Hamstrings**, **4 sets × 10 reps**, **20 lb each side** (40 lb total).
 Contextual number corrections such as “for sets” → “4 sets” are shown in the transcript
 and status. Ordinary phrases like “for 30 seconds” are left alone.
+Missing spaces before counts are repaired too: “RDL4 sets” becomes “RDL 4 sets”,
+so the exercise maps to Legs and the set count is retained.
 
 The preview lets you edit exercise, category, subgroup, sets, reps, weight, weight type,
 and duration. Adding distributes entries to their respective workout sections and

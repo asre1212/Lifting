@@ -7,6 +7,11 @@ function numbers(s){
 }
 function normalizeTranscript(text){
  const corrections=[];
+ // Speech can join the exercise and count (RDL4 sets). Split only before
+ // explicit count syntax; leave names such as B12 Curl or TRX unchanged.
+ text=String(text||'').replace(/\b([a-z][a-z'-]*)(\d+)(?=\s*(?:sets?|reps?)\b|\s*(?:[x×]|by)\s*\d)/gi,(joined,name,count)=>{
+  const separated=`${name} ${count}`;corrections.push(`${joined} → ${separated}`);return separated;
+ });
  // Only fix homophones in count positions, never ordinary "for 30 seconds" or "to failure".
  text=String(text||'').replace(/\b(for|fore|to|too|ate)(?=\s+(?:sets?|reps?)\b)/gi,(word)=>{
   const digit={for:'4',fore:'4',to:'2',too:'2',ate:'8'}[word.toLowerCase()];

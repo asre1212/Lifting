@@ -5,7 +5,7 @@
      • Everything else                           → network-first, fall to cache
    ───────────────────────────────────────────────────────────────────────── */
 
-const VERSION     = 'lifttrack-v7-1-voice-parser';
+const VERSION     = 'lifttrack-v7-2-voice-spacing';
 const CACHE_SHELL = VERSION + '-shell';
 const CACHE_CDN   = VERSION + '-cdn';
 

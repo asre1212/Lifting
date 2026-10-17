@@ -12,6 +12,18 @@ test('RDL homophone from the wrong tab',()=>{
  assert.equal(LiftVoiceParser.normalizeTranscript(text).text,'RDLs 4 sets of 10 at 20 pounds each side.');
  assert.deepEqual(parse(text,'arms'),[{exercise:'Romanian Deadlift',section:'legs',subgroup:'Glutes / Hamstrings',sets:4,reps:10,weight:20,weightMode:'each',duration:'',issues:[]}]);
 });
+test('joined exercise/count tokens still map to the right category',()=>{
+ for(const text of ['RDL4 sets of 10 at 20 pounds each side.','RDLS4sets of 10 at 20 pounds each side.','RDL4x10 at 20 pounds each side.','RDL4 by 10 at 20 pounds each side.']){
+  for(const section of ['arms','back','chest','core','general','legs']){
+   const [p]=parse(text,section,[...catalog,{name:'RDL4',section:'arms',subgroup:'Other Arms'}]);
+   assert.equal(p.exercise,'Romanian Deadlift');assert.equal(p.section,'legs');assert.equal(p.subgroup,'Glutes / Hamstrings');assert.equal(p.sets,4);assert.equal(p.reps,10);assert.equal(p.weight,20);assert.equal(p.weightMode,'each');assert.deepEqual(p.issues,[]);
+  }
+ }
+ const [curl]=parse('Bicep Curl3 sets of 10 at 20 lb','legs');assert.equal(curl.section,'arms');assert.equal(curl.sets,3);
+ const normalized=LiftVoiceParser.normalizeTranscript('RDL4 sets of 10');assert.equal(normalized.text,'RDL 4 sets of 10');assert.ok(normalized.corrections.includes('RDL4 → RDL 4'));
+ assert.deepEqual(LiftVoiceParser.normalizeTranscript(normalized.text),{text:normalized.text,corrections:[]});
+ for(const text of ['B12 Curl, 3 sets of 10','TRX row, 3 sets of 10','RDL4','Zone2 cycling'])assert.equal(LiftVoiceParser.normalizeTranscript(text).text,text);
+});
 test('spoken numbers, separated abbreviation, metric first',()=>{
  for(const text of ['RDLs four sets of eight at twenty five pounds each side.','R D Ls, 4 by 8 at 25 pounds each side.','R.D.L.s, 4 x 8 at 25 pounds each side.','4 sets of 8 RDLs at 25 pounds each side.']){
   const [p]=parse(text,'back');assert.equal(p.exercise,'Romanian Deadlift');assert.equal(p.section,'legs');assert.equal(p.sets,4);assert.equal(p.reps,8);assert.equal(p.weight,25);assert.equal(p.weightMode,'each');

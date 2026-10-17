@@ -11,6 +11,12 @@ await page.locator('#voice-text').fill('RDLs for sets of 10 at 20 pounds each si
 assert.equal(await page.locator('#voice-text').inputValue(),'RDLs 4 sets of 10 at 20 pounds each side.');
 assert.match(await page.locator('#voice-status').textContent(),/for → 4/);
 for(const [field,value] of Object.entries({exercise:'Romanian Deadlift',section:'legs',subgroup:'Glutes / Hamstrings',sets:'4',reps:'10',weight:'20',weightMode:'each'}))assert.equal(await page.locator(`#voice-preview [data-field="${field}"]`).inputValue(),value);
+// Missing whitespace must not turn the exercise into an unknown Arms entry.
+await page.locator('#voice-text').fill('RDL4 sets of 10 at 20 pounds each side.');await page.locator('#voice-parse').click();
+assert.equal(await page.locator('#voice-text').inputValue(),'RDL 4 sets of 10 at 20 pounds each side.');
+assert.match(await page.locator('#voice-status').textContent(),/RDL4 → RDL 4/);
+for(const [field,value] of Object.entries({exercise:'Romanian Deadlift',section:'legs',subgroup:'Glutes / Hamstrings',sets:'4',reps:'10',weight:'20',weightMode:'each'}))assert.equal(await page.locator(`#voice-preview [data-field="${field}"]`).inputValue(),value);
+assert.equal(await page.locator('#voice-preview').getByText(/Please review:/).count(),0);
 await page.screenshot({path:'/tmp/lifting-voice-fixed.png',fullPage:true});
 assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
 await page.locator('#voice-add').click();assert.equal(await page.evaluate(()=>curSec),'legs');
@@ -39,7 +45,7 @@ await page.evaluate(()=>{navigator.mediaDevices.getUserMedia=async()=>{throw new
 await page.locator('#voice-text').fill('');
 await page.evaluate(()=>{
  navigator.mediaDevices.getUserMedia=async()=>({getTracks:()=>[{stop(){}}]});
- window.Worker=class{postMessage({id}){queueMicrotask(()=>this.onmessage({data:{id,text:'RDLs for sets of 10 at 20 pounds each side.'}}))}terminate(){}};
+ window.Worker=class{postMessage({id}){queueMicrotask(()=>this.onmessage({data:{id,text:'RDL4 sets of 10 at 20 pounds each side.'}}))}terminate(){}};
  window.AudioContext=class{async decodeAudioData(){return {duration:1}}async close(){}};
  window.OfflineAudioContext=class{createBufferSource(){return {connect(){},start(){}}}async startRendering(){return {getChannelData:()=>new Float32Array(16000).fill(.1)}}};
 });
