@@ -1,12 +1,55 @@
 const assert=require('node:assert/strict');require('../voice-parser.js');
-const parse=t=>LiftVoiceParser.parse(t,[{name:'Bench press',section:'chest'},{name:'Dumbbell curls',section:'arms'},{name:'Plank',section:'core'}],'general');
-let p=parse('Bench press, three sets of eight at one hundred thirty five pounds. Dumbbell curls, three sets of ten at twenty five pounds each.');
-assert.equal(p.length,2);assert.equal(p[0].weight,135);assert.equal(p[0].sets,3);assert.equal(p[0].reps,8);assert.equal(p[0].section,'chest');assert.equal(p[1].weightMode,'each');assert.equal(p[1].weight,25);
-p=parse('Dumbbell curls, 3 x 10 at 22.5 pounds each.');assert.equal(p.length,1);assert.equal(p[0].weight,22.5);
-p=parse('Bench press, 3 sets of 8 at 60 kilograms');assert.equal(p[0].weight,132.28);
-p=parse('Plank for 90 seconds bodyweight');assert.equal(p[0].duration,1.5);assert.equal(p[0].weight,0);
-p=parse('Bench press');assert.equal(p[0].sets,'');assert.ok(p[0].issues.length);
-assert.equal(parse('').length,0);
-p=parse('New exercise, 2 sets of 12 at 40 pounds');assert.equal(p[0].section,'general');assert.ok(p[0].issues.includes('Check exercise and category'));
-p=parse('Bench press, 2 sets of 8 at 135 pounds; Bench press, 1 set of 6 at 145 pounds');assert.equal(p.length,2);assert.equal(p[1].sets,1);
-console.log('8 parser scenarios passed');
+const catalog=[{name:'Bench Press',section:'chest'},{name:'Dumbbell curls',section:'arms'},{name:'Plank',section:'core'},{name:'Romanian Deadlift',section:'legs',subgroup:'Glutes / Hamstrings'},{name:'Bicep Curl',section:'arms'},{name:'Leg Curl',section:'legs'},{name:'Deadlift',section:'back'}];
+const parse=(t,fallback='general',entries=catalog)=>LiftVoiceParser.parse(t,entries,fallback);
+let scenarios=0;
+function test(name,run){try{run();scenarios++;}catch(e){console.error(name);throw e;}}
+test('word numbers and separate exercises',()=>{
+ const p=parse('Bench press, three sets of eight at one hundred thirty five pounds. Dumbbell curls, three sets of ten at twenty five pounds each.');
+ assert.equal(p.length,2);assert.equal(p[0].weight,135);assert.equal(p[0].sets,3);assert.equal(p[0].reps,8);assert.equal(p[0].section,'chest');assert.equal(p[1].weightMode,'each');assert.equal(p[1].weight,25);
+});
+test('RDL homophone from the wrong tab',()=>{
+ const text='RDLs for sets of 10 at 20 pounds each side.';
+ assert.equal(LiftVoiceParser.normalizeTranscript(text).text,'RDLs 4 sets of 10 at 20 pounds each side.');
+ assert.deepEqual(parse(text,'arms'),[{exercise:'Romanian Deadlift',section:'legs',subgroup:'Glutes / Hamstrings',sets:4,reps:10,weight:20,weightMode:'each',duration:'',issues:[]}]);
+});
+test('spoken numbers, separated abbreviation, metric first',()=>{
+ for(const text of ['RDLs four sets of eight at twenty five pounds each side.','R D Ls, 4 by 8 at 25 pounds each side.','R.D.L.s, 4 x 8 at 25 pounds each side.','4 sets of 8 RDLs at 25 pounds each side.']){
+  const [p]=parse(text,'back');assert.equal(p.exercise,'Romanian Deadlift');assert.equal(p.section,'legs');assert.equal(p.sets,4);assert.equal(p.reps,8);assert.equal(p.weight,25);assert.equal(p.weightMode,'each');
+ }
+});
+test('categories and subgroups independent of current tab',()=>{
+ const examples=[['biceps curls','Bicep Curl','arms','Biceps'],['leg curls','Leg Curl','legs','Glutes / Hamstrings'],['deadlifts','Deadlift','back','Lower Back'],['reverse flies','Reverse Fly','back','Upper Back'],['chest flies','Chest Fly','chest','Mid Chest'],['shoulder press','Overhead Press','general','Compound'],['lunges','Lunges','legs','Quads'],['pull ups','Pull-ups','back','Lats'],['skull crushers','Skull Crusher','arms','Triceps']];
+ for(const [spoken,name,section,subgroup] of examples){const p=parse(spoken+', 3 sets of 10 at 25 lb','core')[0];assert.equal(p.exercise,name);assert.equal(p.section,section);assert.equal(p.subgroup,subgroup);assert.deepEqual(p.issues,[]);}
+});
+test('equipment variants do not merge into different history',()=>{
+ const p=parse('Dumbbell bench press 3 sets of 8 at 25 lb each','legs')[0];assert.equal(p.exercise,'Dumbbell bench press');assert.equal(p.section,'chest');assert.equal(p.subgroup,'Mid Chest');
+ const r=parse('Single leg RDL 3 sets of 8 at 25 lb','arms')[0];assert.equal(r.exercise,'Single leg RDL');assert.equal(r.section,'legs');
+});
+test('respect exact user names and categories',()=>{
+ const p=parse('RDLs 4 sets of 8 at 25 pounds','arms',[...catalog,{name:'RDLs',section:'back',subgroup:'Lower Back'}])[0];assert.equal(p.exercise,'RDLs');assert.equal(p.section,'back');assert.equal(p.subgroup,'Lower Back');
+});
+test('conflicting catalog categories are flagged',()=>{
+ const p=parse('Bench press, 3 sets of 8 at 25 lb','arms',[...catalog,{name:'Bench Press',section:'arms'}])[0];assert.equal(p.section,'arms');assert.match(p.issues.join(' '),/multiple categories/);
+});
+test('homophones only in count contexts',()=>{
+ const t='Plank for 30 seconds bodyweight. Bench press for three sets of eight at 135 pounds. Pushups to failure.';
+ assert.equal(LiftVoiceParser.normalizeTranscript(t).text,t);
+ const p=parse('Biceps curls too sets of ate at 25 pounds');assert.equal(p[0].sets,2);assert.equal(p[0].reps,8);
+});
+test('decimal and kilogram weights',()=>{
+ const p=parse('Dumbbell curls, 3 x 10 at 22.5 pounds each.');assert.equal(p.length,1);assert.equal(p[0].weight,22.5);
+ assert.equal(parse('Bench press, 3 sets of 8 at 60 kilograms')[0].weight,132.28);
+ assert.equal(parse('Bench press, 3 sets of 8 at twenty two point five pounds')[0].weight,22.5);
+});
+test('duration and bodyweight',()=>{const p=parse('Plank for 90 seconds bodyweight')[0];assert.equal(p.exercise,'Plank');assert.equal(p.duration,1.5);assert.equal(p.weight,0);assert.deepEqual(p.issues,[]);});
+test('missing fields are not invented',()=>{
+ let p=parse('Bench press')[0];assert.equal(p.sets,'');assert.ok(p.issues.length);
+ p=parse('Bench press sets of 8 at 135 pounds')[0];assert.equal(p.exercise,'Bench Press');assert.equal(p.sets,'');assert.equal(p.reps,8);
+ p=parse('Bench press 4 sets at 135 pounds')[0];assert.equal(p.reps,'');assert.equal(p.sets,4);
+});
+test('empty and unknown input',()=>{assert.equal(parse('').length,0);const p=parse('New exercise, 2 sets of 12 at 40 pounds')[0];assert.equal(p.section,'general');assert.ok(p.issues.includes('Check exercise and category'));});
+test('repeated exercises and compound names',()=>{
+ const p=parse('Bench press, 2 sets of 8 at 135 pounds; Bench press, 1 set of 6 at 145 pounds');assert.equal(p.length,2);assert.equal(p[1].sets,1);
+ const q=parse('Clean and press, 3 sets of 8 at 25 lb.');assert.equal(q.length,1);assert.equal(q[0].exercise,'Clean and Press');
+});
+console.log(`${scenarios} parser regression scenarios passed`);

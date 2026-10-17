@@ -48,27 +48,70 @@ async function transcribe(){
   if(Math.sqrt(energy/pcm.length)<0.002)throw new Error('No clear speech detected. Try again closer to the microphone.');
   const r=await call('transcribe',pcm);
   $('voice-text').value=[$('voice-text').value,r.text.trim()].filter(Boolean).join('\n');
-  status('Transcript ready. Check the words, then Preview entries.');
+  parse();
  }catch(e){status(e.message);}finally{if(ctx)await ctx.close();controls(false);}
 }
 function parse(){
- preview=LiftVoiceParser.parse($('voice-text').value,qlCatalog().map(e=>({name:e.name,section:e.section})),curSec);
+ const normalized=LiftVoiceParser.normalizeTranscript($('voice-text').value);
+ $('voice-text').value=normalized.text;
+ preview=LiftVoiceParser.parse(normalized.text,qlCatalog(),curSec);
  const box=$('voice-preview');box.replaceChildren();
  for(const [i,p] of preview.entries()){
+  if(!SUBGROUPS[p.section].includes(p.subgroup))p.subgroup=inferSubgroup(p.exercise,p.section);
   const row=document.createElement('div');row.className='voice-preview-row';
-  const label=document.createElement('strong');label.textContent=p.exercise;row.append(label);
-  const details=document.createElement('p');details.textContent=`${SECS[p.section].label} · ${p.sets||'?'} × ${p.reps||'?'} · ${p.weight===''?'?':p.weight} lb ${p.weightMode==='each'?'each':'total'}${p.duration?' · '+p.duration+' min':''}`;row.append(details);
-  if(p.issues.length){const warning=document.createElement('p');warning.textContent=p.issues.join(' · ');row.append(warning);}
+  const heading=document.createElement('strong');heading.textContent=p.exercise;row.append(heading);
+  const grid=document.createElement('div');grid.className='voice-fields';row.append(grid);
+  function field(label,key,options){
+   const wrap=document.createElement('label');wrap.textContent=label;
+   if(key==='exercise'||key==='subgroup')wrap.className='voice-wide';
+   const input=document.createElement(options?'select':'input');input.dataset.field=key;
+   input.id=`voice-entry-${i}-${key}`;wrap.htmlFor=input.id;
+   if(options)for(const [value,text] of options)input.add(new Option(text,value));
+   else if(key==='exercise'){input.type='text';input.required=true;input.autocomplete='off';}
+   else{input.type='number';input.min=key==='sets'||key==='reps'?'1':'0';input.step=key==='sets'||key==='reps'?'1':'any';input.inputMode=key==='sets'||key==='reps'?'numeric':'decimal';input.placeholder='Not specified';}
+   input.value=p[key];
+   input.oninput=()=>{p[key]=input.type==='number'?(input.value===''?'':Number(input.value)):input.value;};
+   wrap.append(input);grid.append(wrap);return input;
+  }
+  const exercise=field('Exercise','exercise');
+  const section=field('Category','section',Object.entries(SECS).map(([value,sec])=>[value,sec.label]));
+  field('Weight type','weightMode',[['total','Total'],['each','Each side']]);
+  const subgroup=field('Subgroup','subgroup',SUBGROUPS[p.section].map(g=>[g,g]));
+  function setSubgroup(){
+   subgroup.replaceChildren();for(const g of SUBGROUPS[p.section])subgroup.add(new Option(g,g));
+   if(!SUBGROUPS[p.section].includes(p.subgroup))p.subgroup=inferSubgroup(p.exercise,p.section);
+   subgroup.value=p.subgroup;
+  }
+  section.onchange=()=>{p.section=section.value;p.subgroup=inferSubgroup(p.exercise,p.section);setSubgroup();};
+  exercise.onchange=()=>{
+   const found=LiftVoiceParser.resolveExercise(exercise.value.trim(),qlCatalog(),p.section);
+   p.exercise=found.exercise;exercise.value=p.exercise;heading.textContent=p.exercise;
+   p.section=found.section;section.value=p.section;p.subgroup=found.subgroup;setSubgroup();
+  };
+  field('Sets','sets');field('Reps','reps');field('Weight (lb)','weight');field('Time (minutes)','duration');
+  if(p.issues.length){const warning=document.createElement('p');warning.textContent='Please review: '+p.issues.join(' · ');row.append(warning);}
   box.append(row);
  }
  $('voice-add').hidden=!preview.length;
- status(preview.length?'Review the preview. Add to workout to edit individual fields before saving.':'No entries found. Try: Bench press, 3 sets of 8 at 135 pounds.');
+ const correction=normalized.corrections.length?'Corrected '+normalized.corrections.join(', ')+'. ':'';
+ status(preview.length?correction+'Review the fields below. Add to workout places each exercise in its category.':'No entries found. Try: Bench press, 3 sets of 8 at 135 pounds.');
 }
 function add(){
  if(!preview.length)return;
- const first=preview[0].section;
- for(const p of preview){const section=p.section;rows[section]=rows[section].filter(r=>(r.exercise||'').trim());const {issues,...entry}=p;entry.subgroup=inferSubgroup(p.exercise,section);delete entry.section;rows[section].push(entry);}
- preview=[];$('voice-preview').replaceChildren();$('voice-add').hidden=true;$('voice-text').value='';setSec(first);status('Entries added. Check the workout cards, then Save workout.');toast('Voice entries added — review before saving');
+ for(const input of $('voice-preview').querySelectorAll('input')){
+  if(input.type==='text')input.setCustomValidity(input.value.trim()?'':'Enter an exercise name.');
+  if(!input.reportValidity())return;
+ }
+ const first=preview[0].section,counts={};
+ for(const p of preview){
+  const section=p.section;counts[section]=(counts[section]||0)+1;
+  rows[section]=rows[section].filter(r=>(r.exercise||'').trim());
+  // Only workout fields enter storage; transcript, corrections and warnings stay ephemeral.
+  rows[section].push({exercise:p.exercise.trim(),subgroup:p.subgroup,sets:p.sets,reps:p.reps,weight:p.weight,weightMode:p.weightMode,duration:p.duration});
+ }
+ const destinations=Object.entries(counts).map(([sec,n])=>`${n} to ${SECS[sec].label}`).join(', ');
+ preview=[];$('voice-preview').replaceChildren();$('voice-add').hidden=true;$('voice-text').value='';setSec(first);
+ status(`Added ${destinations}. Check the workout cards, then Save workout.`);toast('Voice entries added — review before saving');
 }
 function cancel(){generation++;canceled=true;stop();release();abortWorker('Canceled.');controls(false);status('Canceled. Audio discarded.');}
 function init(){
