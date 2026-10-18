@@ -727,8 +727,10 @@
 .voice-card label{display:block;font-size:12px;margin:12px 0 6px}.voice-card textarea{box-sizing:border-box;width:100%;padding:12px;font:inherit;font-size:16px;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:8px}
 .voice-actions{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0}.voice-actions button{padding:10px 12px;min-height:44px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);font:inherit;font-size:12px;cursor:pointer}.voice-actions button:disabled{opacity:.5}.voice-preview-row{padding:10px 0;border-top:1px solid var(--border)}.voice-preview-row strong{font-size:14px}
 .voice-fields{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px 10px}.voice-fields .voice-wide{grid-column:1/-1}.voice-fields label{min-width:0;margin:8px 0 0}.voice-fields input,.voice-fields select{display:block;box-sizing:border-box;width:100%;min-height:44px;margin-top:6px;padding:8px;font:inherit;font-size:16px;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:8px}
+.voice-tools{margin-top:16px;border-top:1px solid var(--border);padding-top:14px}.voice-tools summary{cursor:pointer;font-size:13px;font-weight:700;min-height:32px}.voice-scroll{max-height:320px;overflow:auto;margin-top:10px}.voice-memory-row,.voice-dictionary-row{padding:10px 0;border-top:1px solid var(--border);overflow-wrap:anywhere}.voice-memory-row strong,.voice-dictionary-row strong{font-size:13px}.voice-card .voice-remember-note{margin:6px 0;font-size:11px}
 </style>
 <script defer src="voice-parser.js"></script>
+<script defer src="voice-memory.js"></script>
 <script defer src="voice.js"></script>
 </head>
 
@@ -818,6 +820,12 @@
           <i data-lucide="refresh-cw" width="13" height="13"></i>
           Refresh
         </button>
+      </div>
+      <div class="backup-divider"></div>
+      <div class="backup-row">
+        <div class="backup-icon-wrap"><i data-lucide="book-open" width="17" height="17"></i></div>
+        <div class="backup-info"><div class="backup-title">Exercise dictionary</div><div class="backup-sub">Common names &amp; saved voice corrections</div></div>
+        <button type="button" class="backup-btn import" id="voice-manage">Manage</button>
       </div>
     </div>
   </div>
@@ -914,6 +922,29 @@
       <textarea id="voice-text" rows="4" placeholder="Bench press, 3 sets of 8 at 135 pounds." autocomplete="off" autocorrect="off" spellcheck="false"></textarea>
       <div class="voice-actions"><button type="button" id="voice-parse">Preview entries</button><button type="button" id="voice-add" hidden>Add to workout</button></div>
       <div id="voice-preview"></div>
+      <details id="voice-memory" class="voice-tools">
+        <summary>Exercise names &amp; corrections</summary>
+        <p id="voice-memory-count"></p>
+        <p>Remember a name, category and subgroup for next time. Saved on this device and included in your JSON backup.</p>
+        <p id="voice-memory-status" role="status" aria-live="polite"></p>
+        <form id="voice-memory-form">
+          <div class="voice-fields">
+            <label class="voice-wide" for="voice-memory-phrase">What you say / what it hears<input id="voice-memory-phrase" type="text" maxlength="120" required autocomplete="off" placeholder="e.g. my hamstring lift"></label>
+            <label class="voice-wide" for="voice-memory-exercise">Use exercise name<input id="voice-memory-exercise" type="text" maxlength="120" required autocomplete="off" list="voice-exercise-names" placeholder="e.g. Romanian Deadlift"></label>
+            <label class="voice-wide" for="voice-memory-section">Category<select id="voice-memory-section"></select></label>
+            <label class="voice-wide" for="voice-memory-subgroup">Subgroup<select id="voice-memory-subgroup"></select></label>
+          </div>
+          <div class="voice-actions"><button type="submit" id="voice-memory-save">Save mapping</button><button type="button" id="voice-memory-cancel" hidden>Cancel edit</button></div>
+        </form>
+        <div id="voice-memory-list"></div>
+        <div class="voice-actions"><button type="button" id="voice-memory-clear" hidden>Forget all corrections</button></div>
+        <details id="voice-dictionary" class="voice-tools">
+          <summary>Browse common exercises</summary>
+          <div class="voice-fields"><label class="voice-wide" for="voice-dictionary-search">Search names or abbreviations<input id="voice-dictionary-search" type="search" autocomplete="off" placeholder="e.g. RDL, squat, cable"></label></div>
+          <div id="voice-dictionary-list" class="voice-scroll"></div>
+        </details>
+      </details>
+      <datalist id="voice-exercise-names"></datalist>
     </div>
     <div id="ex-cards"></div>
 
@@ -1088,7 +1119,7 @@
   /* ──────────────────────────────────────
      CONSTANTS & DEFAULTS
   ────────────────────────────────────── */
-  const APP_VERSION = '7.3';
+  const APP_VERSION = '7.4';
   const SECS = {
     arms:{label:'Arms',color:'#FF4F3B',icon:'zap'}, back:{label:'Back',color:'#5B4BFF',icon:'layers'},
     legs:{label:'Legs',color:'#00B894',icon:'move-vertical'}, core:{label:'Core',color:'#FF3D7B',icon:'target'},
@@ -1934,11 +1965,15 @@
   }
 
   async function exportData() {
+    let voiceCorrections;
+    try { voiceCorrections = LiftVoiceMemory.exportData(); }
+    catch (_) { toast('Could not read saved voice corrections. Check Exercise dictionary.'); return; }
     const payload = {
       app: 'LiftTrack',
       exported: new Date().toISOString(),
       workouts: getWO(),
-      exercises: getEx()
+      exercises: getEx(),
+      voiceCorrections
     };
     const json = JSON.stringify(payload, null, 2);
     const blob = new Blob([json], { type: 'application/json' });
@@ -2072,7 +2107,12 @@
       reader.onload = ev => {
         try {
           const data = JSON.parse(ev.target.result);
-          if (!data.workouts && !data.exercises) throw new Error('Unrecognised file');
+          if (!data || typeof data !== 'object' || (!data.workouts && !data.exercises && !data.voiceCorrections)) throw new Error('Unrecognised file');
+          const hasCorrections = Object.hasOwn(data, 'voiceCorrections');
+          // Validate new data before changing any existing workout or exercise storage.
+          if (hasCorrections) LiftVoiceMemory.validateBackup(data.voiceCorrections);
+          if (data.workouts && !Array.isArray(data.workouts)) throw new Error('Invalid workouts');
+          if (data.exercises && (typeof data.exercises !== 'object' || Object.values(data.exercises).some(v => !Array.isArray(v)))) throw new Error('Invalid exercises');
 
           // Merge rather than overwrite — combine workouts deduped by id
           if (data.workouts) {
@@ -2095,7 +2135,8 @@
 
           rebuildDL();
           renderHome();
-          toast(`✓ Import complete`);
+          const learned = hasCorrections ? LiftVoiceMemory.merge(data.voiceCorrections) : null;
+          toast(learned ? `✓ Import complete · ${learned.added} voice corrections added` : '✓ Import complete');
         } catch(err) {
           toast('Invalid backup file');
         }

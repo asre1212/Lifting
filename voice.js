@@ -5,6 +5,9 @@
 const $=id=>document.getElementById(id);
 let worker, pending, seq=0, recorder, stream, chunks=[], timer, canceled=false, preview=[], generation=0;
 const status=s=>$('voice-status').textContent=s;
+let editingPhrase=null, savingPreviewCorrection=false;
+const mapping=p=>JSON.stringify([p.exercise,p.section,p.subgroup]);
+function invalidatePreview(){preview=[];$('voice-preview').replaceChildren();$('voice-add').hidden=true;}
 
 function call(op,audio){
  if(!worker){
@@ -66,10 +69,11 @@ async function transcribe(mimeType,gen){
 function parse(){
  const normalized=LiftVoiceParser.normalizeTranscript($('voice-text').value);
  $('voice-text').value=normalized.text;
- preview=LiftVoiceParser.parse(normalized.text,qlCatalog(),curSec);
+ preview=LiftVoiceParser.parse(normalized.text,qlCatalog(),curSec,LiftVoiceMemory.list());
  const box=$('voice-preview');box.replaceChildren();
  for(const [i,p] of preview.entries()){
   if(!SUBGROUPS[p.section].includes(p.subgroup))p.subgroup=inferSubgroup(p.exercise,p.section);
+  let savedMapping=mapping(p);
   const row=document.createElement('div');row.className='voice-preview-row';
   const heading=document.createElement('strong');heading.textContent=p.exercise;row.append(heading);
   const grid=document.createElement('div');grid.className='voice-fields';row.append(grid);
@@ -79,10 +83,10 @@ function parse(){
    const input=document.createElement(options?'select':'input');input.dataset.field=key;
    input.id=`voice-entry-${i}-${key}`;wrap.htmlFor=input.id;
    if(options)for(const [value,text] of options)input.add(new Option(text,value));
-   else if(key==='exercise'){input.type='text';input.required=true;input.autocomplete='off';}
+   else if(key==='exercise'){input.type='text';input.required=true;input.maxLength=120;input.autocomplete='off';input.setAttribute('list','voice-exercise-names');}
    else{input.type='number';input.min=key==='sets'||key==='reps'?'1':'0';input.step=key==='sets'||key==='reps'?'1':'any';input.inputMode=key==='sets'||key==='reps'?'numeric':'decimal';input.placeholder='Not specified';}
    input.value=p[key];
-   input.oninput=()=>{p[key]=input.type==='number'?(input.value===''?'':Number(input.value)):input.value;};
+   input.oninput=()=>{p[key]=input.type==='number'?(input.value===''?'':Number(input.value)):input.value;updateRemember();};
    wrap.append(input);grid.append(wrap);return input;
   }
   const exercise=field('Exercise','exercise');
@@ -94,15 +98,39 @@ function parse(){
    if(!SUBGROUPS[p.section].includes(p.subgroup))p.subgroup=inferSubgroup(p.exercise,p.section);
    subgroup.value=p.subgroup;
   }
-  section.onchange=()=>{p.section=section.value;p.subgroup=inferSubgroup(p.exercise,p.section);setSubgroup();};
+  section.onchange=()=>{p.section=section.value;p.subgroup=inferSubgroup(p.exercise,p.section);setSubgroup();updateRemember();};
   exercise.onchange=()=>{
-   const found=LiftVoiceParser.resolveExercise(exercise.value.trim(),qlCatalog(),p.section);
+   const found=LiftVoiceParser.resolveExercise(exercise.value.trim(),qlCatalog(),p.section,LiftVoiceMemory.list());
    p.exercise=found.exercise;exercise.value=p.exercise;heading.textContent=p.exercise;
-   p.section=found.section;section.value=p.section;p.subgroup=found.subgroup;setSubgroup();
+   p.issues=[...p.issues.filter(issue=>!issue.includes('category')),...found.issues];
+   p.section=found.section;section.value=p.section;p.subgroup=found.subgroup;setSubgroup();updateRemember();
   };
   field('Sets','sets');field('Reps','reps');field('Weight (lb)','weight');field('Time (minutes)','duration');
-  if(p.issues.length){const warning=document.createElement('p');warning.textContent='Please review: '+p.issues.join(' · ');row.append(warning);}
-  box.append(row);
+  const warning=document.createElement('p');row.append(warning);
+  const rememberActions=document.createElement('div');rememberActions.className='voice-actions';
+  const rememberButton=document.createElement('button');rememberButton.type='button';rememberButton.dataset.action='remember';rememberActions.append(rememberButton);
+  const rememberNote=document.createElement('p');rememberNote.className='voice-remember-note';
+  row.append(rememberActions,rememberNote);
+  function updateRemember(){
+   const issues=p.issues.filter(issue=>issue!=='Sets or reps missing'&&!issue.startsWith('Weight missing'));
+   if(!p.duration&&(!p.sets||!p.reps))issues.push('Sets or reps missing');
+   if(p.weight==='')issues.push('Weight missing; enter it or use bodyweight');
+   warning.hidden=!issues.length;warning.textContent=issues.length?'Please review: '+issues.join(' · '):'';
+   const changed=mapping(p)!==savedMapping;
+   rememberButton.hidden=!changed;rememberButton.textContent=p.remembered?'Update saved correction':'Remember this correction';
+   rememberNote.textContent=changed?`Remember “${p.spokenExercise}” as this exercise and category.`:p.remembered?`Using your saved correction for “${p.spokenExercise}”.`:'';
+  }
+  rememberButton.onclick=()=>{
+   if(!exercise.reportValidity())return;
+   try{
+    savingPreviewCorrection=true;
+    LiftVoiceMemory.remember({phrase:p.spokenExercise,exercise:p.exercise,section:p.section,subgroup:p.subgroup});
+    p.issues=p.issues.filter(issue=>!issue.includes('category'));
+    p.remembered=true;savedMapping=mapping(p);updateRemember();
+    status('Correction saved on this device. Future entries will use this exercise, category and subgroup.');
+   }catch(e){status(e.message);}finally{savingPreviewCorrection=false;}
+  };
+  updateRemember();box.append(row);
  }
  $('voice-add').hidden=!preview.length;
  const correction=normalized.corrections.length?'Corrected '+normalized.corrections.join(', ')+'. ':'';
@@ -125,10 +153,89 @@ function add(){
  preview=[];$('voice-preview').replaceChildren();$('voice-add').hidden=true;$('voice-text').value='';setSec(first);
  status(`Added ${destinations}. Check the workout cards, then Save workout.`);toast('Voice entries added — review before saving');
 }
+
+function setMemorySubgroups(selected){
+ const section=$('voice-memory-section').value,select=$('voice-memory-subgroup');
+ select.replaceChildren();for(const name of SUBGROUPS[section])select.add(new Option(name,name));
+ select.value=SUBGROUPS[section].includes(selected)?selected:inferSubgroup($('voice-memory-exercise').value,section);
+}
+function resetMemoryForm(){
+ editingPhrase=null;$('voice-memory-form').reset();$('voice-memory-section').value=curSec;setMemorySubgroups();
+ $('voice-memory-save').textContent='Save mapping';$('voice-memory-cancel').hidden=true;
+}
+function editMemory(entry){
+ editingPhrase=entry.phrase;$('voice-memory-phrase').value=entry.phrase;$('voice-memory-exercise').value=entry.exercise;
+ $('voice-memory-section').value=entry.section;setMemorySubgroups(entry.subgroup);
+ $('voice-memory-save').textContent='Save changes';$('voice-memory-cancel').hidden=false;
+ $('voice-memory-phrase').focus();$('voice-memory-form').scrollIntoView({block:'nearest'});
+}
+function renderDictionary(){
+ const query=LiftVoiceParser.key($('voice-dictionary-search').value),box=$('voice-dictionary-list');box.replaceChildren();
+ const items=LiftVoiceParser.dictionary().filter(e=>!query||e.aliases.some(a=>a.includes(query))).sort((a,b)=>a.name.localeCompare(b.name));
+ for(const entry of items){
+  const row=document.createElement('div');row.className='voice-dictionary-row';
+  const name=document.createElement('strong');name.textContent=entry.name;
+  const category=document.createElement('p');category.textContent=`${SECS[entry.section].label} · ${entry.subgroup}`;
+  row.append(name,category);box.append(row);
+ }
+ if(!items.length){const empty=document.createElement('p');empty.textContent='No common exercise found. You can add your own mapping above.';box.append(empty);}
+}
+function refreshMemory(){
+ const entries=LiftVoiceMemory.list(),box=$('voice-memory-list');box.replaceChildren();
+ $('voice-memory-count').textContent=`${LiftVoiceParser.dictionary().length} common exercises · ${entries.length} saved corrections`;
+ $('voice-memory-clear').hidden=!entries.length&&!LiftVoiceMemory.problem();
+ const names=new Set([...LiftVoiceParser.dictionary().map(e=>e.name),...qlCatalog().map(e=>e.name),...entries.map(e=>e.exercise)]);
+ const suggestions=$('voice-exercise-names');suggestions.replaceChildren();
+ for(const name of [...names].sort()){const option=document.createElement('option');option.value=name;suggestions.append(option);}
+ for(const entry of entries.sort((a,b)=>a.phrase.localeCompare(b.phrase))){
+  const row=document.createElement('div');row.className='voice-memory-row';
+  const title=document.createElement('strong');title.textContent=`${entry.phrase} → ${entry.exercise}`;
+  const category=document.createElement('p');category.textContent=`${SECS[entry.section].label} · ${entry.subgroup}`;
+  const actions=document.createElement('div');actions.className='voice-actions';
+  const edit=document.createElement('button');edit.type='button';edit.textContent='Edit';edit.setAttribute('aria-label',`Edit correction for ${entry.phrase}`);edit.onclick=()=>editMemory(entry);
+  const forget=document.createElement('button');forget.type='button';forget.textContent='Forget';forget.setAttribute('aria-label',`Forget correction for ${entry.phrase}`);
+  forget.onclick=()=>{try{LiftVoiceMemory.forget(entry.phrase);if(editingPhrase===entry.phrase)resetMemoryForm();$('voice-memory-status').textContent='Correction forgotten.';}catch(e){$('voice-memory-status').textContent=e.message;}};
+  actions.append(edit,forget);row.append(title,category,actions);box.append(row);
+ }
+ const problem=LiftVoiceMemory.problem();if(problem)$('voice-memory-status').textContent=problem;
+}
+function initDictionary(){
+ const select=$('voice-memory-section');for(const [value,section] of Object.entries(SECS))select.add(new Option(section.label,value));
+ resetMemoryForm();refreshMemory();
+ $('voice-manage').onclick=()=>{
+  goTab('log');$('voice-panel').hidden=false;$('voice-record').setAttribute('aria-expanded','true');$('voice-memory').open=true;
+  refreshMemory();$('voice-memory').scrollIntoView({block:'start'});
+ };
+ $('voice-memory').ontoggle=()=>{if($('voice-memory').open)refreshMemory();};
+ $('voice-dictionary').ontoggle=()=>{if($('voice-dictionary').open)renderDictionary();};
+ $('voice-dictionary-search').oninput=renderDictionary;
+ $('voice-memory-section').onchange=()=>setMemorySubgroups();
+ $('voice-memory-exercise').onchange=()=>{
+  const found=LiftVoiceParser.resolveExercise($('voice-memory-exercise').value.trim(),qlCatalog(),$('voice-memory-section').value,LiftVoiceMemory.list());
+  $('voice-memory-exercise').value=found.exercise;$('voice-memory-section').value=found.section;setMemorySubgroups(found.subgroup);
+ };
+ $('voice-memory-cancel').onclick=resetMemoryForm;
+ $('voice-memory-form').onsubmit=e=>{
+  e.preventDefault();
+  try{
+   LiftVoiceMemory.remember({phrase:$('voice-memory-phrase').value,exercise:$('voice-memory-exercise').value,section:$('voice-memory-section').value,subgroup:$('voice-memory-subgroup').value},editingPhrase);
+   resetMemoryForm();$('voice-memory-status').textContent='Mapping saved on this device. Preview your entry again to apply it.';
+  }catch(error){$('voice-memory-status').textContent=error.message;}
+ };
+ $('voice-memory-clear').onclick=()=>{
+  if(!confirm('Forget all saved voice corrections?'))return;
+  try{LiftVoiceMemory.clear();resetMemoryForm();$('voice-memory-status').textContent='Saved corrections cleared.';}catch(e){$('voice-memory-status').textContent=e.message;}
+ };
+ const changed=()=>{refreshMemory();if(!savingPreviewCorrection)invalidatePreview();};
+ window.addEventListener('voice-memory-changed',changed);
+ window.addEventListener('storage',e=>{if(e.key==='lt_voice_corrections'||e.key===null)changed();});
+}
+
 function cancel(){generation++;canceled=true;stop();release();chunks=[];abortWorker('Canceled.');controls(false);status('Canceled. Audio discarded.');}
 function init(){
  $('voice-load').onclick=loadModel;$('voice-record').onclick=toggleRecording;$('voice-cancel').onclick=()=>{cancel();$('voice-panel').hidden=true;$('voice-record').setAttribute('aria-expanded','false');$('voice-record').focus();};$('voice-parse').onclick=parse;$('voice-add').onclick=add;
- $('voice-text').oninput=()=>{preview=[];$('voice-preview').replaceChildren();$('voice-add').hidden=true;};
+ $('voice-text').oninput=invalidatePreview;
+ initDictionary();
  document.addEventListener('visibilitychange',()=>{if(document.hidden&&(stream||recorder?.state==='recording'))cancel();});
  window.addEventListener('pagehide',cancel);
 }

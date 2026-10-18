@@ -10,7 +10,7 @@ test('word numbers and separate exercises',()=>{
 test('RDL homophone from the wrong tab',()=>{
  const text='RDLs for sets of 10 at 20 pounds each side.';
  assert.equal(LiftVoiceParser.normalizeTranscript(text).text,'RDLs 4 sets of 10 at 20 pounds each side.');
- assert.deepEqual(parse(text,'arms'),[{exercise:'Romanian Deadlift',section:'legs',subgroup:'Glutes / Hamstrings',sets:4,reps:10,weight:20,weightMode:'each',duration:'',issues:[]}]);
+ assert.deepEqual(parse(text,'arms'),[{exercise:'Romanian Deadlift',section:'legs',subgroup:'Glutes / Hamstrings',spokenExercise:'RDLs',sets:4,reps:10,weight:20,weightMode:'each',duration:'',issues:[]}]);
 });
 test('joined exercise/count tokens still map to the right category',()=>{
  for(const text of ['RDL4 sets of 10 at 20 pounds each side.','RDLS4sets of 10 at 20 pounds each side.','RDL4x10 at 20 pounds each side.','RDL4 by 10 at 20 pounds each side.']){
@@ -34,8 +34,8 @@ test('categories and subgroups independent of current tab',()=>{
  for(const [spoken,name,section,subgroup] of examples){const p=parse(spoken+', 3 sets of 10 at 25 lb','core')[0];assert.equal(p.exercise,name);assert.equal(p.section,section);assert.equal(p.subgroup,subgroup);assert.deepEqual(p.issues,[]);}
 });
 test('equipment variants do not merge into different history',()=>{
- const p=parse('Dumbbell bench press 3 sets of 8 at 25 lb each','legs')[0];assert.equal(p.exercise,'Dumbbell bench press');assert.equal(p.section,'chest');assert.equal(p.subgroup,'Mid Chest');
- const r=parse('Single leg RDL 3 sets of 8 at 25 lb','arms')[0];assert.equal(r.exercise,'Single leg RDL');assert.equal(r.section,'legs');
+ const p=parse('Dumbbell bench press 3 sets of 8 at 25 lb each','legs')[0];assert.equal(p.exercise,'Dumbbell Bench Press');assert.equal(p.section,'chest');assert.equal(p.subgroup,'Mid Chest');
+ const r=parse('Single leg RDL 3 sets of 8 at 25 lb','arms')[0];assert.equal(r.exercise,'Single-leg Romanian Deadlift');assert.equal(r.section,'legs');
 });
 test('respect exact user names and categories',()=>{
  const p=parse('RDLs 4 sets of 8 at 25 pounds','arms',[...catalog,{name:'RDLs',section:'back',subgroup:'Lower Back'}])[0];assert.equal(p.exercise,'RDLs');assert.equal(p.section,'back');assert.equal(p.subgroup,'Lower Back');
@@ -63,5 +63,21 @@ test('empty and unknown input',()=>{assert.equal(parse('').length,0);const p=par
 test('repeated exercises and compound names',()=>{
  const p=parse('Bench press, 2 sets of 8 at 135 pounds; Bench press, 1 set of 6 at 145 pounds');assert.equal(p.length,2);assert.equal(p[1].sets,1);
  const q=parse('Clean and press, 3 sets of 8 at 25 lb.');assert.equal(q.length,1);assert.equal(q[0].exercise,'Clean and Press');
+});
+test('expanded dictionary covers common equipment, mobility and cardio names',()=>{
+ const examples=[['DB bench','Dumbbell Bench Press','chest','Mid Chest'],['BB RDL','Barbell Romanian Deadlift','legs','Glutes / Hamstrings'],['BSS','Bulgarian Split Squat','legs','Quads'],['single leg RDL','Single-leg Romanian Deadlift','legs','Glutes / Hamstrings'],['seated hamstring curls','Seated Leg Curl','legs','Glutes / Hamstrings'],['lying leg curls','Lying Leg Curl','legs','Glutes / Hamstrings'],['DB rows','Dumbbell Row','back','Upper Back'],['cable curls','Cable Curl','arms','Biceps'],['side raises','Lateral Raise','general','Other'],['row machine','Rowing Machine','general','Conditioning'],['hip flexor stretch','Hip Flexor Stretch','general','Mobility']];
+ for(const [spoken,name,section,subgroup] of examples){const [p]=parse(spoken+', 3 sets of 10 at 20 pounds','core');assert.equal(p.exercise,name);assert.equal(p.section,section);assert.equal(p.subgroup,subgroup);assert.deepEqual(p.issues,[]);}
+ const [bike]=parse('bike for 15 minutes bodyweight');assert.equal(bike.exercise,'Stationary Bike');assert.equal(bike.duration,15);
+});
+test('dictionary aliases cannot silently shadow different exercises',()=>{
+ const seen=new Map();const dictionary=LiftVoiceParser.dictionary();assert.ok(dictionary.length>=150);
+ for(const entry of dictionary)for(const alias of entry.aliases){assert.ok(!seen.has(alias)||seen.get(alias)===entry.name,`${alias}: ${seen.get(alias)} / ${entry.name}`);seen.set(alias,entry.name);assert.equal(LiftVoiceParser.resolveExercise(alias).exercise,entry.name);const [parsed]=LiftVoiceParser.parse(alias+', 3 sets of 10 at 20 lb',[],'arms');assert.equal(parsed.exercise,entry.name);assert.equal(parsed.section,entry.section);}
+});
+test('personal mappings override history and defaults without changing workout metrics',()=>{
+ const memory=[{phrase:'my leg lift',exercise:'Romanian Deadlift',section:'legs',subgroup:'Glutes / Hamstrings'},{phrase:'RDL',exercise:'Single-leg Romanian Deadlift',section:'legs',subgroup:'Glutes / Hamstrings'}];
+ const [p]=LiftVoiceParser.parse('My leg lift, 2 sets of 12 at 30 pounds each',catalog,'arms',memory);
+ assert.equal(p.spokenExercise,'My leg lift');assert.equal(p.exercise,'Romanian Deadlift');assert.equal(p.section,'legs');assert.equal(p.sets,2);assert.equal(p.reps,12);assert.equal(p.weight,30);assert.equal(p.remembered,true);
+ const [rdl]=LiftVoiceParser.parse('RDLs 3 sets of 10 at 20 lb',catalog,'arms',memory);assert.equal(rdl.exercise,'Single-leg Romanian Deadlift');
+ assert.equal(LiftVoiceParser.resolveExercise('my leg lift variation',catalog,'arms',memory).remembered,undefined);
 });
 console.log(`${scenarios} parser regression scenarios passed`);

@@ -5,7 +5,7 @@
      • Everything else                           → network-first, fall to cache
    ───────────────────────────────────────────────────────────────────────── */
 
-const VERSION     = 'lifttrack-v7-3-voice-microphone';
+const VERSION     = 'lifttrack-v7-4-voice-learning';
 const CACHE_SHELL = VERSION + '-shell';
 const CACHE_CDN   = VERSION + '-cdn';
 
@@ -14,6 +14,7 @@ const SHELL_ASSETS = [
   './',
   './index.html',
   './voice-parser.js',
+  './voice-memory.js',
   './voice.js',
   './voice-worker.js',
   './vendor/transformers.min.js',
