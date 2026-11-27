@@ -86,6 +86,15 @@
 
   define(window, 'localStorage', shim);
 
+  // Only the bundled WKWebView replaces this existing controls entry point.
+  document.addEventListener('click', function (event) {
+    var target = event.target;
+    if (!target || typeof target.closest !== 'function' || !target.closest('#auto-backup-open')) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    post('filesBackup', {});
+  }, true);
+
   /* ── Web Share ──────────────────────────────────────────────────────────
      index.html hands us a File for both the JSON backup and the .xlsx
      export, and treats a rejection named 'AbortError' as "user cancelled",

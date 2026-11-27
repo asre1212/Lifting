@@ -35,35 +35,52 @@ final class Storage {
         queue.sync { data }
     }
 
-    func set(_ key: String, _ value: String) {
+    var backupValues: [String: String] {
+        get throws {
+            try queue.sync {
+                guard FileManager.default.fileExists(atPath: fileURL.path) else { return [:] }
+                let raw = try Data(contentsOf: fileURL)
+                guard let stored = try JSONSerialization.jsonObject(with: raw) as? [String: String]
+                else { throw LiftFilesBackup.Failure.invalid }
+                return stored.filter { LiftFilesBackup.keys.contains($0.key) }
+            }
+        }
+    }
+
+    @discardableResult
+    func set(_ key: String, _ value: String) -> Bool {
         mutate { $0[key] = value }
     }
 
-    func remove(_ key: String) {
+    @discardableResult
+    func remove(_ key: String) -> Bool {
         mutate { $0.removeValue(forKey: key) }
     }
 
-    func clear() {
+    @discardableResult
+    func clear() -> Bool {
         mutate { $0.removeAll() }
     }
 
-    private func mutate(_ block: (inout [String: String]) -> Void) {
+    private func mutate(_ block: (inout [String: String]) -> Void) -> Bool {
         queue.sync {
             block(&data)
-            persist()
+            return persist()
         }
     }
 
     /// Called on `queue` only.
-    private func persist() {
+    private func persist() -> Bool {
         guard let raw = try? JSONSerialization.data(withJSONObject: data, options: [.sortedKeys]) else {
             NSLog("[LiftTrack] could not serialise store")
-            return
+            return false
         }
         do {
             try raw.write(to: fileURL, options: .atomic)
+            return true
         } catch {
             NSLog("[LiftTrack] could not write store: \(error.localizedDescription)")
+            return false
         }
     }
 }

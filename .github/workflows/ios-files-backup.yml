@@ -1,0 +1,18 @@
+name: Verify native LiftTrack Files backup
+on:
+  pull_request:
+    paths:
+      - 'ios/**'
+      - '.github/workflows/ios-files-backup.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Test backup rotation and schema
+        run: swiftc ios/LiftTrack/FilesBackup.swift ios/Scripts/LiftFilesBackupChecks.swift -o "${RUNNER_TEMP}/lift-backup-checks" && "${RUNNER_TEMP}/lift-backup-checks"
+      - name: Build iOS app and widget for the simulator
+        run: xcodebuild -project ios/LiftTrack.xcodeproj -scheme LiftTrack -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO build

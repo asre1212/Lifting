@@ -164,3 +164,14 @@ the native app.
   data, which is accurate — the app makes no network requests.
 - `ENABLE_USER_SCRIPT_SANDBOXING` is off so the copy phase can read the web app
   from the repository root, one level above the Xcode project.
+
+## Auto Backup in Files
+
+In Data, tap **Auto Backup**, then **Choose folder**. The app keeps its latest
+two distinct workout/exercise backups in an app-specific subfolder of the
+location you pick, and stores only permission metadata internally. Disconnect
+only stops future writes, leaving all external files untouched. Re-select the
+folder if the Files provider revokes or expires access. No audio, voice
+dictionary, app settings, or credentials are included. To recover, use the
+existing **Import JSON** in Data; this merges records according to the normal
+import rules. Manual export is unchanged.

@@ -23,6 +23,7 @@
 		3B0000000000000000000008 /* RestTimerIntents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B0000000000000000000008 /* RestTimerIntents.swift */; };
 		3B0000000000000000000009 /* RestTimerIntents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B0000000000000000000008 /* RestTimerIntents.swift */; };
 		3B0000000000000000000007 /* LiftTrackWidgets.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 2B0000000000000000000006 /* LiftTrackWidgets.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		3A00000000000000000000A9 /* FilesBackup.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A00000000000000000000A9 /* FilesBackup.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -68,6 +69,7 @@
 		2B0000000000000000000006 /* LiftTrackWidgets.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = LiftTrackWidgets.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		2B0000000000000000000007 /* RestTimerController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RestTimerController.swift; sourceTree = "<group>"; };
 		2B0000000000000000000008 /* RestTimerIntents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RestTimerIntents.swift; sourceTree = "<group>"; };
+		2A00000000000000000000A9 /* FilesBackup.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilesBackup.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -106,6 +108,7 @@
 				2A0000000000000000000002 /* SceneDelegate.swift */,
 				2A0000000000000000000003 /* WebViewController.swift */,
 				2A0000000000000000000004 /* Storage.swift */,
+				2A00000000000000000000A9 /* FilesBackup.swift */,
 				2B0000000000000000000007 /* RestTimerController.swift */,
 				2A0000000000000000000005 /* Bridge.js */,
 				2A0000000000000000000006 /* Assets.xcassets */,
@@ -289,6 +292,7 @@
 				3A0000000000000000000002 /* SceneDelegate.swift in Sources */,
 				3A0000000000000000000003 /* WebViewController.swift in Sources */,
 				3A0000000000000000000004 /* Storage.swift in Sources */,
+				3A00000000000000000000A9 /* FilesBackup.swift in Sources */,
 				3B0000000000000000000001 /* RestTimerController.swift in Sources */,
 				3B0000000000000000000002 /* RestActivityAttributes.swift in Sources */,
 				3B0000000000000000000008 /* RestTimerIntents.swift in Sources */,
