@@ -1,4 +1,5 @@
 import UIKit
+import UniformTypeIdentifiers
 import WebKit
 
 /// Hosts the LiftTrack web app full screen and wires it to native services.
@@ -7,6 +8,12 @@ final class WebViewController: UIViewController {
     private static let backgroundColor = UIColor(red: 0x0D / 255, green: 0x0D / 255, blue: 0x0D / 255, alpha: 1)
 
     private var webView: WKWebView!
+    private static let filesBookmarkKey = "LiftTrackAutoBackupFolder"
+    private static let backupOwnerKey = "LiftTrackAutoBackupOwner"
+    private let filesQueue = DispatchQueue(label: "com.lifttrack.files-backup", qos: .utility)
+    // Read/written only on filesQueue. These values contain no workout content.
+    private var pendingFilesBackup: DispatchWorkItem?
+    private var backupFailure: String?
 
     /// The page's globals (`__ltRestSync` and friends) only exist once the
     /// document has run, so native pushes are held until then.
@@ -102,6 +109,7 @@ final class WebViewController: UIViewController {
     private func buildWebView() {
         let controller = WKUserContentController()
         controller.add(self, name: Channel.store)
+        controller.add(self, name: Channel.filesBackup)
         controller.add(self, name: Channel.share)
         controller.add(self, name: Channel.haptics)
         controller.add(self, name: Channel.restTimer)
@@ -202,6 +210,7 @@ final class WebViewController: UIViewController {
 
 private enum Channel {
     static let store = "store"
+    static let filesBackup = "filesBackup"
     static let share = "share"
     static let haptics = "haptics"
     static let restTimer = "restTimer"
@@ -213,6 +222,12 @@ extension WebViewController: WKScriptMessageHandler {
                                didReceive message: WKScriptMessage) {
         switch message.name {
         case Channel.store:     handleStore(message.body)
+        case Channel.filesBackup:
+            guard message.frameInfo.isMainFrame,
+                  message.frameInfo.request.url?.standardizedFileURL ==
+                      Bundle.main.url(forResource: "index", withExtension: "html", subdirectory: "www")?.standardizedFileURL
+            else { return }
+            showFilesBackupOptions()
         case Channel.share:     handleShare(message.body)
         case Channel.haptics:   handleHaptics(message.body)
         case Channel.restTimer: handleRestTimer(message.body)
@@ -228,12 +243,12 @@ extension WebViewController: WKScriptMessageHandler {
         switch op {
         case "set":
             guard let key = payload["key"] as? String, let value = payload["value"] as? String else { return }
-            Storage.shared.set(key, value)
+            if Storage.shared.set(key, value), LiftFilesBackup.keys.contains(key) { scheduleFilesBackup() }
         case "remove":
             guard let key = payload["key"] as? String else { return }
-            Storage.shared.remove(key)
+            if Storage.shared.remove(key), LiftFilesBackup.keys.contains(key) { scheduleFilesBackup() }
         case "clear":
-            Storage.shared.clear()
+            if Storage.shared.clear() { scheduleFilesBackup() }
         default:
             break
         }
@@ -412,5 +427,88 @@ extension WebViewController: WKNavigationDelegate {
 
     func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
         NSLog("[LiftTrack] provisional navigation failed: \(error.localizedDescription)")
+    }
+}
+
+// MARK: - Files-only automatic backup
+
+extension WebViewController: UIDocumentPickerDelegate {
+    private func scheduleFilesBackup() {
+        guard UserDefaults.standard.data(forKey: Self.filesBookmarkKey) != nil else { return }
+        filesQueue.async { [weak self] in
+            guard let self else { return }
+            self.pendingFilesBackup?.cancel()
+            let work = DispatchWorkItem { [weak self] in
+                guard let self else { return }
+                self.pendingFilesBackup = nil
+                self.captureFilesBackup()
+            }
+            self.pendingFilesBackup = work
+            // A workout save updates the workout and exercise keys together.
+            self.filesQueue.asyncAfter(deadline: .now() + 0.25, execute: work)
+        }
+    }
+
+    private func captureFilesBackup() {
+        guard let data = UserDefaults.standard.data(forKey: Self.filesBookmarkKey) else { return }
+        do {
+            let folder = try JSONDecoder().decode(LiftFilesBackup.Destination.self, from: data)
+            try folder.capture(Storage.shared.backupValues)
+            backupFailure = nil
+        } catch {
+            backupFailure = error.localizedDescription
+        }
+    }
+
+    private func showFilesBackupOptions() {
+        guard presentedViewController == nil else { return }
+        let destination = UserDefaults.standard.data(forKey: Self.filesBookmarkKey)
+            .flatMap { try? JSONDecoder().decode(LiftFilesBackup.Destination.self, from: $0) }
+        let status = filesQueue.sync { backupFailure }
+        let details = destination.map { "Selected folder: " + $0.name }
+            ?? "Select a folder in Files to turn on automatic backup."
+        let alert = UIAlertController(title: "Auto Backup", message: [
+            details,
+            "Keeps the two latest copies of workouts and exercises in the selected folder. No backup is kept in the app. Import JSON backups from Data to restore.",
+            status
+        ].compactMap { $0 }.joined(separator: "\n\n"), preferredStyle: .alert)
+        alert.addAction(UIAlertAction(title: destination == nil ? "Choose folder" : "Choose another folder", style: .default) { [weak self] _ in
+            alert.dismiss(animated: true) { [weak self] in self?.pickFilesBackupDirectory() }
+        })
+        if destination != nil {
+            alert.addAction(UIAlertAction(title: "Disconnect", style: .default) { [weak self] _ in
+                UserDefaults.standard.removeObject(forKey: Self.filesBookmarkKey)
+                self?.filesQueue.async { [weak self] in
+                    self?.pendingFilesBackup?.cancel()
+                    self?.pendingFilesBackup = nil
+                    self?.backupFailure = nil
+                }
+            })
+        }
+        alert.addAction(UIAlertAction(title: "Close", style: .cancel))
+        present(alert, animated: true)
+    }
+
+    private func pickFilesBackupDirectory() {
+        guard presentedViewController == nil else { return }
+        let picker = UIDocumentPickerViewController(forOpeningContentTypes: [.folder], asCopy: false)
+        picker.allowsMultipleSelection = false
+        picker.delegate = self
+        present(picker, animated: true)
+    }
+
+    func documentPicker(_ controller: UIDocumentPickerViewController, didPickDocumentsAt urls: [URL]) {
+        guard let url = urls.first else { return }
+        do {
+            let defaults = UserDefaults.standard
+            let owner = defaults.string(forKey: Self.backupOwnerKey).flatMap(UUID.init(uuidString:)) ?? UUID()
+            let destination = try LiftFilesBackup.Destination(selecting: url, owner: owner)
+            defaults.set(try JSONEncoder().encode(destination), forKey: Self.filesBookmarkKey)
+            defaults.set(owner.uuidString, forKey: Self.backupOwnerKey)
+            scheduleFilesBackup()
+        } catch {
+            let reason = error.localizedDescription
+            filesQueue.async { [weak self] in self?.backupFailure = reason }
+        }
     }
 }
