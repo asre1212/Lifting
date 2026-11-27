@@ -5,7 +5,7 @@
      • Everything else                           → network-first, fall to cache
    ───────────────────────────────────────────────────────────────────────── */
 
-const VERSION     = 'lifttrack-v7-5-responsive';
+const VERSION     = 'lifttrack-v7-6-auto-backup';
 const CACHE_SHELL = VERSION + '-shell';
 const CACHE_CDN   = VERSION + '-cdn';
 
@@ -13,6 +13,7 @@ const CACHE_CDN   = VERSION + '-cdn';
 const SHELL_ASSETS = [
   './',
   './index.html',
+  './auto-backup.js',
   './voice-parser.js',
   './voice-memory.js',
   './voice.js',

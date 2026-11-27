@@ -766,6 +766,7 @@
       <span class="sec-label-line"></span>
     </div>
     <div class="backup-card">
+      <button type="button" class="backup-btn" id="auto-backup-open" onclick="window.backup?.open()">Auto Backup</button>
       <div class="backup-row">
         <div class="backup-icon-wrap" style="background:#F0EFFF">
           <i data-lucide="download" width="17" height="17" style="color:var(--back)"></i>
@@ -1161,7 +1162,7 @@
      STORAGE
   ────────────────────────────────────── */
   const load = k     => JSON.parse(localStorage.getItem(k) || 'null');
-  const save = (k,v) => localStorage.setItem(k, JSON.stringify(v));
+  const save = (k,v) => {localStorage.setItem(k, JSON.stringify(v)); if(k==='lt_wo'||k==='lt_ex')window.backup?.capture();};
   const getWO = ()   => load('lt_wo') || [];
   const setWO = d    => save('lt_wo', d);
   const getEx = () => { const saved=load('lt_ex'); if(!saved)return JSON.parse(JSON.stringify(DEF_EX)); const out={}; Object.keys(SECS).forEach(sec=>{out[sec]=Array.isArray(saved[sec])?saved[sec]:(DEF_EX[sec]||[]).slice();}); return out; };
@@ -2183,6 +2184,19 @@
     });
   }
   </script>
+<script src="./auto-backup.js"></script>
+<script>
+window.backup = TrackerBackup.setup({id:'lifting',
+read: () => Object.fromEntries(['lt_wo','lt_ex','lt_voice_corrections'].map(k => [k,JSON.parse(localStorage.getItem(k) || 'null')])),
+validate: v => v && (v.lt_wo === null || (Array.isArray(v.lt_wo) && v.lt_wo.every(w => w && typeof w.id === 'string' && /^[a-z0-9_-]{1,160}$/i.test(w.id) && typeof w.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(w.date) && Array.isArray(w.entries)))) && (v.lt_ex === null || (!Array.isArray(v.lt_ex) && typeof v.lt_ex === 'object' && Object.values(v.lt_ex).every(a=>Array.isArray(a)&&a.every(s=>typeof s==='string')))) && (v.lt_voice_corrections === null || Boolean(window.LiftVoiceMemory.validateBackup(v.lt_voice_corrections))),
+write: value => {
+ const keys=['lt_wo','lt_ex','lt_voice_corrections'], previous=new Map(keys.map(k=>[k,localStorage.getItem(k)]));
+ try { for(const k of keys){if(value[k]===null)localStorage.removeItem(k);else localStorage.setItem(k,JSON.stringify(value[k]));} }
+ catch(error){for(const [k,raw] of previous){if(raw===null)localStorage.removeItem(k);else localStorage.setItem(k,raw);}throw error;}
+}
+});
+window.addEventListener('voice-memory-changed', () => window.backup.capture());
+</script>
 </body>
 </html>
 
